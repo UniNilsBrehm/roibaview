@@ -1,0 +1,11 @@
+PyQt6
+pyqtgraph
+numpy
+pandas
+scipy
+h5py
+tifftools
+tifffile
+opencv-python
+ffmpy
+roifile

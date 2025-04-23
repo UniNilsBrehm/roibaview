@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="roibaview",
     version="0.1.0",
+    license="MIT",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -27,7 +28,7 @@ setup(
     author="Nils",
     author_email="your.email@example.com",
     description="A PyQt6-based application for ROI visualization.",
-    url="https://github.com/UniNilsBrehm/RoiBaView",
+    url="https://github.com/UniNilsBrehm/roibaview",
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

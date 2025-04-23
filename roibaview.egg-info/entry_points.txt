@@ -1,0 +1,2 @@
+[console_scripts]
+roibaview = roibaview.main:main
