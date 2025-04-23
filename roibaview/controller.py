@@ -87,24 +87,20 @@ class Controller(QObject):
 
         self.pyqtgraph_settings = PyqtgraphSettings()
 
-        # Create Config File if there is none
-        # check = os.listdir('roibaview/')
+        # Check Config File
         package_dir = os.path.dirname(__file__)
-        check = os.listdir(package_dir)  # or a subfolder relative to this
-        self.config_name = 'config.ini'
-        if self.config_name not in check:
+        config_path = os.path.join(package_dir, 'config.ini')
+        self.config_name = config_path
+
+        if not os.path.exists(self.config_name):
             self._create_config_file()
         else:
-            # load config file
             self.config = configparser.ConfigParser()
             self.config.read(self.config_name)
 
     def _create_config_file(self):
         self.config = configparser.ConfigParser()
-
-        self.config['FFMPEG'] = {
-            'dir': 'NaN',
-        }
+        self.config['FFMPEG'] = {'dir': 'NaN'}
         with open(self.config_name, 'w') as configfile:
             self.config.write(configfile)
 
