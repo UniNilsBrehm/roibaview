@@ -1,0 +1,11 @@
+# ignore ALL .log files
+*.log
+*.idea
+
+# ignore ALL files in ANY directory named...
+.idea
+__pycache__
+.idea/
+__pycache__/
+build
+roibaview.egg-info
