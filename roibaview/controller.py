@@ -91,13 +91,13 @@ class Controller(QObject):
         # check = os.listdir('roibaview/')
         package_dir = os.path.dirname(__file__)
         check = os.listdir(package_dir)  # or a subfolder relative to this
-
-        if 'config.ini' not in check:
+        self.config_name = 'config.ini'
+        if self.config_name not in check:
             self._create_config_file()
         else:
             # load config file
             self.config = configparser.ConfigParser()
-            self.config.read('roibaview/config.ini')
+            self.config.read(self.config_name)
 
     def _create_config_file(self):
         self.config = configparser.ConfigParser()
@@ -105,8 +105,7 @@ class Controller(QObject):
         self.config['FFMPEG'] = {
             'dir': 'NaN',
         }
-
-        with open('roibaview/config.ini', 'w') as configfile:
+        with open(self.config_name, 'w') as configfile:
             self.config.write(configfile)
 
     def connections(self):

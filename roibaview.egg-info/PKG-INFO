@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: roibaview
-Version: 0.1.0
+Version: 0.1.2
 Summary: A PyQt6-based application for ROI visualization.
 Home-page: https://github.com/UniNilsBrehm/roibaview
 Author: Nils
@@ -30,69 +30,25 @@ Welcome to the <i>RoiBaView</i>.
 With this viewer you can plot and analyze signals from different kinds of experiments (e.g. Calcium Imaging).
 
 ## Installation
-Before running the "main.py" file you should make sure that you have installed all the needed dependencies.
-You can manually install the dependencies via pip or conda (Anaconda) like this:
+1. Create a new environment (e.g. in Anaconda)
 
 ```shell
-pip install numpy
-pip install pandas
-pip install scipy
-pip install ipython
-pip install PyQt6
-pip install pyqtgraph
-pip install opencv-python
-pip install ffmpy
-pip install h5py
-pip install tifffile
+conda create -n roibaview
 ```
-Or you can use the "conda_env.yml" file to create an anaconda environment like this:<br>
-Open you anaconda prompt (terminal) and navigate to the location of the "conda_env.yml" file.<br>
-Then type:<br>
+
+2. Then make sure you have installed pip
 
 ```shell
-conda env create -f conda_env.yml
-```
-Don't forget to activate your new environment:
-```shell
-conda activate viewer
+conda install pip
 ```
 
-To start the Viewer, open your <i>terminal</i> of choice and go to the directory containing the files.<br>
-Then run "main.py":<br>
+3. Install "roibaview" via pip
 
 ```shell
-python main.py
+pip install roibaview
 ```
 
-## Short cut for starting the app in Windows
-You can use the "Start_RoiBaView.bat" file to quickly start the app. For this just double click the batch file. 
-However, for it to work, you have to adjust some lines in the batch file.
-
-Under "REM Path to the Python script directory" change:
-
-
-<i> SET ANACONDA_PATH=*Your\Path\To\Anaconda\anaconda3* </i> (for Anaconda)
-
-or
-
-<i> SET ANACONDA_PATH=*Your\Path\To\Anaconda\miniconda3* </i> (for Miniconda)
-
-
-If you don't know the path you can find it by opening the anaconda prompt and type:
-```shell
-where conda
-```
-
-Under "REM Name of the Anaconda environment" change to your anaconda environment:
-
-SET ENV_NAME=*NameOfYourEnvironment*
-
-Under "REM Path to the Python script directory" change to the directory of ROIBAVIEW:
-
-SET SCRIPT_DIR=*Your\Path\To\RoiBaView*
-
-
-## Import Data
+## Importing Data
 You can import data from .csv files (comma separated).<br>
 <i>File --> Import csv file ...</i><br>
 
@@ -141,4 +97,4 @@ First time you open the video converter it will ask you to specify the directory
 
 
 ### ----------
-Nils Brehm - 2024
+Nils Brehm - 2025

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roibaview"
-version = "0.1.0"
+version = "0.1.2"
 description = "A PyQt6-based application for ROI visualization."
 authors = [
     { name="Nils", email="your.email@example.com" }
