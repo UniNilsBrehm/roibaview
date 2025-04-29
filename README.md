@@ -84,7 +84,7 @@ Need to convert from another separator? Use:
 
 ---
 
-## Video Viewer & Converter
+## Video Viewer & Video Converter
 
 - Open the **Video Viewer** under **Tools → Open Video Viewer**.
 - Connect video frames to ROI data for synchronized viewing.
