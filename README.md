@@ -28,7 +28,7 @@ Visualize, detect peaks, sync data with videos, and manage your datasets with an
 1. Create a new environment (e.g., using Anaconda):
 
     ```bash
-    conda create -n roibaview python=3.8
+    conda create -n roibaview
     ```
 
 2. Activate the environment and ensure pip is installed:
