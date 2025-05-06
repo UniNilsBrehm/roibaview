@@ -191,6 +191,18 @@ class MainWindow(QMainWindow):
         self.tools_menu_detect_vr = self.tools_menu.addAction('Ventral Root Event Detection')
         self.tools_menu_detect_peaks = self.tools_menu.addAction('Peak Detection')
 
+        # PLUGINS
+        self.plugins_menu = self.data_sets_list_context_menu.addMenu('Plugins')
+        self.plugins_menu_actions = []  # Keep track of actions dynamically
+
+    def populate_plugins_menu(self, plugins, callback):
+        self.plugins_menu.clear()
+        self.plugins_menu_actions = []
+        for plugin in plugins:
+            action = self.plugins_menu.addAction(plugin.name)
+            action.triggered.connect(lambda checked, p=plugin: callback(p))
+            self.plugins_menu_actions.append(action)
+
     def show_context_menu(self, pos):
         # Show context menu at the position of the mouse cursor
         self.data_sets_list_context_menu.exec(self.data_sets_list.mapToGlobal(pos))

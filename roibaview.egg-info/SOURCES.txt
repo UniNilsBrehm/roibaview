@@ -22,3 +22,6 @@ roibaview.egg-info/dependency_links.txt
 roibaview.egg-info/entry_points.txt
 roibaview.egg-info/requires.txt
 roibaview.egg-info/top_level.txt
+roibaview/plugins/base.py
+roibaview/plugins/filter_zap.py
+roibaview/plugins/loader.py

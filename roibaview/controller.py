@@ -17,6 +17,7 @@ from roibaview.custom_view_box import CustomViewBoxMenu
 from roibaview.registration import Registrator
 from roibaview.video_viewer import VideoViewer
 from roibaview.video_converter import VideoConverter
+from roibaview.plugins.loader import load_plugins
 
 
 class Controller(QObject):
@@ -80,6 +81,10 @@ class Controller(QObject):
         # Establish Connections to Buttons and Menus
         self.connections()
 
+        # Load Plugins
+        self.plugins = load_plugins()
+        self.gui.populate_plugins_menu(self.plugins, self.apply_plugin)
+
         # KeyBoard Bindings
         # self.gui.key_pressed.connect(self.on_key_press)
         # self.gui.key_released.connect(self.on_key_release)
@@ -97,6 +102,28 @@ class Controller(QObject):
         else:
             self.config = configparser.ConfigParser()
             self.config.read(self.config_name)
+
+    def apply_plugin(self, plugin):
+        if not self.selected_data_sets:
+            return
+
+        for data_set_name, data_set_type in zip(self.selected_data_sets, self.selected_data_sets_type):
+            data = self.data_handler.get_data_set(data_set_type, data_set_name)
+            meta = self.data_handler.get_data_set_meta_data(data_set_type, data_set_name)
+            sampling_rate = meta['sampling_rate']
+
+            filtered = plugin.apply(data, sampling_rate)
+            new_name = f"{data_set_name}_{plugin.name.replace(' ', '_')}"
+            self.data_handler.add_new_data_set(
+                data_set_type=data_set_type,
+                data_set_name=new_name,
+                data=filtered,
+                sampling_rate=sampling_rate,
+                time_offset=0,
+                y_offset=0,
+                header=meta.get('roi_names', list(range(filtered.shape[1])))
+            )
+            self.add_data_set_to_list(data_set_type, new_name)
 
     def _create_config_file(self):
         self.config = configparser.ConfigParser()
