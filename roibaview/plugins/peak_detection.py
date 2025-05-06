@@ -5,7 +5,58 @@ from PyQt6.QtWidgets import QVBoxLayout, QSlider, QLabel, QWidget, QSpacerItem, 
 from scipy import signal
 from roibaview.gui import BrowseFileDialog
 import pandas as pd
+from roibaview.plugins.base import BasePlugin
 
+class PeakDetectionPlugin(BasePlugin):
+    name = "Peak Detection"
+    category = "tool"
+
+    def __init__(self, config=None, parent=None):
+        self.config = config
+        self.parent = parent
+        self.roi_signal = getattr(parent, "signal_roi_idx_changed", None)  # Optional
+
+    def apply(self, *_):
+        try:
+            # Get controller-level references from the GUI
+            controller = getattr(self.parent, "controller", None)
+            if not controller:
+                raise RuntimeError("Controller not found in GUI context.")
+
+            if not controller.selected_data_sets:
+                raise RuntimeError("No dataset selected.")
+
+            # Get current dataset and metadata
+            name = controller.selected_data_sets[0]
+            dtype = controller.selected_data_sets_type[0]
+            roi = controller.current_roi_idx
+
+            data = controller.data_handler.get_data_set(dtype, name)
+            meta = controller.data_handler.get_data_set_meta_data(dtype, name)
+            fr = meta["sampling_rate"]
+
+            # Get the main data plot
+            master_plot = controller.data_plotter.master_plot
+
+            # Create the peak detection dialog
+            dialog = PeakDetection(
+                data=data + meta["y_offset"],  # match old behavior
+                fr=fr,
+                master_plot=master_plot,
+                roi=roi,
+                parent=self.parent
+            )
+
+            # Sync with ROI selection signal
+            if self.roi_signal:
+                self.roi_signal.connect(dialog.roi_changed)
+                dialog.finished.connect(lambda: self.roi_signal.disconnect(dialog.roi_changed))
+
+            dialog.exec()
+
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self.parent, "Peak Detection Error", str(e))
 
 # class PeakDetection(QWidget):
 class PeakDetection(QDialog):
@@ -13,9 +64,9 @@ class PeakDetection(QDialog):
     signal_roi_changed = pyqtSignal(int)
     main_window_closing = pyqtSignal()
 
-    def __init__(self, data, fr, master_plot, roi, parent=None):
-        # QWidget.__init__(self)
+    def __init__(self, data, fr, master_plot, roi, parent=None, **kwargs):
         super().__init__(parent)
+
         self.roi_idx = roi
         self.data = data  # this is the data set
         self.data_trace = self.data[:, self.roi_idx]  # this is the roi trace
@@ -184,16 +235,31 @@ class PeakDetection(QDialog):
             reply = QMessageBox.question(
                 self, 'Message',
                 "Are you sure to quit?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
 
             if reply == QMessageBox.StandardButton.Yes:
-                # Here you can perform actions before closing the window
-                self.clear_plot()
+                self._cleanup_on_close()
                 self.done(QDialog.DialogCode.Accepted)
                 event.accept()
             else:
                 event.ignore()
         else:
+            self._cleanup_on_close()
             self.done(QDialog.DialogCode.Accepted)
             event.accept()
+
+    def _cleanup_on_close(self):
+        """Disconnects signals and clears peak visuals."""
+        try:
+            self.signal_roi_changed.disconnect(self.roi_changed)
+        except Exception:
+            pass
+
+        try:
+            self.main_window_closing.disconnect()
+        except Exception:
+            pass
+
+        self.clear_plot()

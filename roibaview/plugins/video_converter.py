@@ -10,6 +10,20 @@ from tifffile import imwrite
 from concurrent.futures import ThreadPoolExecutor
 import math
 import pandas as pd
+from roibaview.plugins.base import BasePlugin
+
+
+class VideoConverterPlugin(BasePlugin):
+    name = "Video Converter"
+    category = "tool"
+
+    def __init__(self, config=None, parent=None):
+        self.config = config
+        self.parent = parent
+
+    def apply(self, *_):
+        self.window = VideoConverter(self.config)
+        self.window.show()
 
 
 class VideoConverter(QMainWindow):

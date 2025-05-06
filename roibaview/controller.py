@@ -11,12 +11,12 @@ from roibaview.data_handler import DataHandler, TransformData
 from roibaview.csv_handling import CSVHandler
 from roibaview.gui import BrowseFileDialog, InputDialog, SimpleInputDialog, ChangeStyle
 from roibaview.data_plotter import DataPlotter, PyqtgraphSettings
-from roibaview.peak_detection import PeakDetection
+# from roibaview.peak_detection import PeakDetection
 from roibaview.ventral_root_detection import VentralRootDetection
 from roibaview.custom_view_box import CustomViewBoxMenu
 from roibaview.registration import Registrator
 from roibaview.video_viewer import VideoViewer
-from roibaview.video_converter import VideoConverter
+# from roibaview.video_converter import VideoConverter
 from roibaview.plugins.loader import load_plugins
 
 
@@ -35,6 +35,7 @@ class Controller(QObject):
         QObject.__init__(self)
         # Create GUI
         self.gui = gui
+        self.gui.controller = self  # Expose controller to plugins via GUI
         self.gui.closeEvent = self.closeEvent
         self.mouse_x_pos = 0
 
@@ -60,7 +61,7 @@ class Controller(QObject):
         # Get a Video Viewer
         self.video_viewer = VideoViewer()
         self.video_viewers = []
-        self.video_converter = None
+        # self.video_converter = None
 
         # Get DataPlotter
         self.data_plotter = DataPlotter(self.gui.trace_plot_item)
@@ -69,7 +70,7 @@ class Controller(QObject):
         self.file_browser = BrowseFileDialog(self.gui)
 
         # Get a Peak Detector
-        self.peak_detection = None
+        # self.peak_detection = None
 
         # Get a VR Detector
         self.vr_detection = None
@@ -80,10 +81,6 @@ class Controller(QObject):
 
         # Establish Connections to Buttons and Menus
         self.connections()
-
-        # Load Plugins
-        self.plugins = load_plugins()
-        self.gui.populate_plugins_menu(self.plugins, self.apply_plugin)
 
         # KeyBoard Bindings
         # self.gui.key_pressed.connect(self.on_key_press)
@@ -103,27 +100,44 @@ class Controller(QObject):
             self.config = configparser.ConfigParser()
             self.config.read(self.config_name)
 
-    def apply_plugin(self, plugin):
+        # Load plugins with context (pass config and GUI as needed)
+        self.plugins = load_plugins(context={
+            'config': self.config,  # or other settings object
+            'parent': self.gui  # used for dialog-based plugins
+        })
+
+        # Categorize them for use
+        self.tool_plugins = [p for p in self.plugins if p.category == "tool"]
+        self.filter_plugins = [p for p in self.plugins if p.category == "filter"]
+        self.analysis_plugins = [p for p in self.plugins if p.category == "analysis"]
+
+        # Register tools in Tools menu
+        self.gui.add_tools_menu_plugins(self.tool_plugins)
+        self.gui.populate_filter_plugins_menu(self.filter_plugins, self.apply_filter_plugin)
+
+        # Optional: later populate filter right-click menu
+        # self.populate_filter_menu()
+        # (Optional) You can later use filter plugins similarly in context menus
+
+    def apply_filter_plugin(self, plugin):
         if not self.selected_data_sets:
             return
 
-        for data_set_name, data_set_type in zip(self.selected_data_sets, self.selected_data_sets_type):
-            data = self.data_handler.get_data_set(data_set_type, data_set_name)
-            meta = self.data_handler.get_data_set_meta_data(data_set_type, data_set_name)
-            sampling_rate = meta['sampling_rate']
-
-            filtered = plugin.apply(data, sampling_rate)
-            new_name = f"{data_set_name}_{plugin.name.replace(' ', '_')}"
+        for name, kind in zip(self.selected_data_sets, self.selected_data_sets_type):
+            data = self.data_handler.get_data_set(kind, name)
+            meta = self.data_handler.get_data_set_meta_data(kind, name)
+            result = plugin.apply(data, meta['sampling_rate'])
+            new_name = f"{name}_{plugin.name.replace(' ', '_')}"
             self.data_handler.add_new_data_set(
-                data_set_type=data_set_type,
+                data_set_type=kind,
                 data_set_name=new_name,
-                data=filtered,
-                sampling_rate=sampling_rate,
+                data=result,
+                sampling_rate=meta['sampling_rate'],
                 time_offset=0,
                 y_offset=0,
-                header=meta.get('roi_names', list(range(filtered.shape[1])))
+                header=meta.get("roi_names", list(range(result.shape[1])))
             )
-            self.add_data_set_to_list(data_set_type, new_name)
+            self.add_data_set_to_list(kind, new_name)
 
     def _create_config_file(self):
         self.config = configparser.ConfigParser()
@@ -150,7 +164,7 @@ class Controller(QObject):
 
         # ROI changed
         self.signal_roi_idx_changed.connect(lambda: self.update_plots(change_global=False))
-        self.signal_roi_idx_changed.connect(self.check_peak_detector)
+        # self.signal_roi_idx_changed.connect(self.check_peak_detector)
 
         # Context Menu
         self.gui.data_sets_list_rename.triggered.connect(self.rename_data_set)
@@ -185,7 +199,7 @@ class Controller(QObject):
         # Remove Column from csv file
         self.gui.tools_menu_csv_remove_column.triggered.connect(self.csv_remove_column)
         # Video Converter
-        self.gui.tools_menu_video_converter.triggered.connect(self.open_video_converter)
+        # self.gui.tools_menu_video_converter.triggered.connect(self.open_video_converter)
         # Convert Ventral Root
         self.gui.tools_menu_convert_ventral_root.triggered.connect(self.convert_ventral_root)
         # Create Stimulus from File
@@ -193,7 +207,7 @@ class Controller(QObject):
         # Ventral Root Event Detection
         self.gui.tools_menu_detect_vr.triggered.connect(self._ventral_root_detection)
         # Peak Detection
-        self.gui.tools_menu_detect_peaks.triggered.connect(self._start_peak_detection)
+        # self.gui.tools_menu_detect_peaks.triggered.connect(self._start_peak_detection)
 
         # KeyBoard Bindings
         self.gui.key_pressed.connect(self.on_key_press)
@@ -519,9 +533,9 @@ class Controller(QObject):
         # self.video_viewer = VideoViewer()
         # self.video_viewer.show()
 
-    def open_video_converter(self):
-        self.video_converter = VideoConverter(self.config)
-        self.video_converter.show()
+    # def open_video_converter(self):
+    #     self.video_converter = VideoConverter(self.config)
+    #     self.video_converter.show()
 
     def y_offset(self):
         if len(self.selected_data_sets) > 0:
@@ -615,32 +629,32 @@ class Controller(QObject):
         if file_dir:
             registrator.start_registration(file_dir)
 
-    def check_peak_detector(self):
-        if self.peak_detection is not None:
-            self.peak_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
-        if self.vr_detection is not None:
-            self.vr_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
+    # def check_peak_detector(self):
+    #     if self.peak_detection is not None:
+    #         self.peak_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
+    #     if self.vr_detection is not None:
+    #         self.vr_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
 
-    def _start_peak_detection(self):
-        if len(self.selected_data_sets) > 0:
-            self.gui.freeze_gui(True)
-            data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
-            # current_data = self.data_handler.get_roi_data(data_set_name, roi_idx=self.current_roi_idx)
-            current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
-            meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
-
-            self.peak_detection = PeakDetection(
-                data=current_data_set + meta_data['y_offset'],
-                fr=meta_data['sampling_rate'],
-                master_plot=self.data_plotter.master_plot,
-                roi=self.current_roi_idx,
-            )
-            # self.peak_detection.signal_roi_changed.connect(lambda value: print("Variable changed:", value))
-            self.peak_detection.show()
-            if self.peak_detection.exec() == QDialog.DialogCode.Accepted:
-                self.gui.freeze_gui(False)
-                self.peak_detection = None
-            # self.peak_detection.exec()
+    # def _start_peak_detection(self):
+    #     if len(self.selected_data_sets) > 0:
+    #         self.gui.freeze_gui(True)
+    #         data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
+    #         # current_data = self.data_handler.get_roi_data(data_set_name, roi_idx=self.current_roi_idx)
+    #         current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
+    #         meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
+    #
+    #         self.peak_detection = PeakDetection(
+    #             data=current_data_set + meta_data['y_offset'],
+    #             fr=meta_data['sampling_rate'],
+    #             master_plot=self.data_plotter.master_plot,
+    #             roi=self.current_roi_idx,
+    #         )
+    #         # self.peak_detection.signal_roi_changed.connect(lambda value: print("Variable changed:", value))
+    #         self.peak_detection.show()
+    #         if self.peak_detection.exec() == QDialog.DialogCode.Accepted:
+    #             self.gui.freeze_gui(False)
+    #             self.peak_detection = None
+    #         # self.peak_detection.exec()
 
     def get_selected_data_sets(self, k):
         data_set_name = self.selected_data_sets[k]
@@ -982,15 +996,15 @@ class Controller(QObject):
             # Save before exit
             self.save_file()
             event.accept()
-            if self.peak_detection is not None:
-                self.peak_detection.main_window_closing.emit()
+            # if self.peak_detection is not None:
+            #     self.peak_detection.main_window_closing.emit()
             # self._save_file()
             self.data_handler.create_new_temp_hdf5_file()
         elif retval == QMessageBox.StandardButton.Discard:
             # Do not save before exit
             event.accept()
-            if self.peak_detection is not None:
-                self.peak_detection.main_window_closing.emit()
+            # if self.peak_detection is not None:
+            #     self.peak_detection.main_window_closing.emit()
             self.data_handler.create_new_temp_hdf5_file()
         else:
             # Do not exit

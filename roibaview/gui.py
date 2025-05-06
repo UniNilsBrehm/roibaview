@@ -182,26 +182,38 @@ class MainWindow(QMainWindow):
         self.tools_menu = self.menu.addMenu('Tools')
         self.tools_menu_open_video_viewer = self.tools_menu.addAction('Open Video Viewer')
         # self.tools_menu_multiplot = self.tools_menu.addAction('Multi Plot')
-        self.tools_menu_video_converter = self.tools_menu.addAction('Convert Video File')
+        # self.tools_menu_video_converter = self.tools_menu.addAction('Convert Video File')
         # self.tools_menu_registration = self.tools_menu.addAction('Registration')
         self.tools_menu_convert_csv = self.tools_menu.addAction('Convert csv files')
         self.tools_menu_csv_remove_column = self.tools_menu.addAction('Remove Column from csv file')
         self.tools_menu_convert_ventral_root = self.tools_menu.addAction('Convert Ventral Root Files')
         self.tools_menu_create_stimulus = self.tools_menu.addAction('Create Stimulus From File')
         self.tools_menu_detect_vr = self.tools_menu.addAction('Ventral Root Event Detection')
-        self.tools_menu_detect_peaks = self.tools_menu.addAction('Peak Detection')
+        # self.tools_menu_detect_peaks = self.tools_menu.addAction('Peak Detection')
 
         # PLUGINS
         self.plugins_menu = self.data_sets_list_context_menu.addMenu('Plugins')
         self.plugins_menu_actions = []  # Keep track of actions dynamically
 
-    def populate_plugins_menu(self, plugins, callback):
+    def populate_filter_plugins_menu(self, plugins, callback):
         self.plugins_menu.clear()
-        self.plugins_menu_actions = []
         for plugin in plugins:
             action = self.plugins_menu.addAction(plugin.name)
-            action.triggered.connect(lambda checked, p=plugin: callback(p))
-            self.plugins_menu_actions.append(action)
+            action.triggered.connect(lambda _, p=plugin: callback(p))
+
+    def add_tools_menu_plugins(self, plugins):
+        """
+        Add all tool plugins to the Tools menu.
+        Disabled ones are visible but grayed out.
+        """
+        for plugin in plugins:
+            action = self.tools_menu.addAction(plugin.name)
+            if not plugin.available():
+                action.setEnabled(False)
+                reason = getattr(plugin, "unavailable_reason", "Plugin not available.")
+                action.setToolTip(reason)
+            else:
+                action.triggered.connect(plugin.apply)
 
     def show_context_menu(self, pos):
         # Show context menu at the position of the mouse cursor
