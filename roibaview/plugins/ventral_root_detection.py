@@ -8,15 +8,65 @@ from scipy import signal
 from roibaview.gui import BrowseFileDialog
 import pandas as pd
 import scipy.signal as sig
+from roibaview.plugins.base import BasePlugin
 
+
+class VentralRootDetectionPlugin(BasePlugin):
+    name = "Ventral Root Detection"
+    category = "tool"
+
+    def __init__(self, config=None, parent=None):
+        self.config = config
+        self.parent = parent
+        self.roi_signal = getattr(parent, "signal_roi_idx_changed", None)  # Optional
+
+    def apply(self, *_):
+        try:
+            # Get controller-level references from the GUI
+            controller = getattr(self.parent, "controller", None)
+            if not controller:
+                raise RuntimeError("Controller not found in GUI context.")
+
+            if not controller.selected_data_sets:
+                raise RuntimeError("No dataset selected.")
+
+            # Get current dataset and metadata
+            name = controller.selected_data_sets[0]
+            dtype = controller.selected_data_sets_type[0]
+            roi = controller.current_roi_idx
+
+            data = controller.data_handler.get_data_set(dtype, name)
+            meta = controller.data_handler.get_data_set_meta_data(dtype, name)
+            fr = meta["sampling_rate"]
+
+            # Get the main data plot
+            master_plot = controller.data_plotter.master_plot
+
+            # Create the peak detection dialog
+            dialog = VentralRootDetection(
+                data=data + meta["y_offset"],  # match old behavior
+                fr=fr,
+                master_plot=master_plot,
+                roi=roi,
+                parent=self.parent
+            )
+
+            # Sync with ROI selection signal
+            if self.roi_signal:
+                self.roi_signal.connect(dialog.roi_changed)
+                dialog.finished.connect(lambda: self.roi_signal.disconnect(dialog.roi_changed))
+
+            dialog.exec()
+
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self.parent, "Ventral Root Detection Error", str(e))
 
 class VentralRootDetection(QDialog):
 
     signal_roi_changed = pyqtSignal(int)
     main_window_closing = pyqtSignal()
-
-    def __init__(self, data, fr, master_plot, roi, parent=None):
-        # QWidget.__init__(self)
+    def __init__(self, data, fr, master_plot, roi, parent=None, **kwargs):
         super().__init__(parent)
         self.roi_idx = roi
         self.data = data  # this is the data set
@@ -74,14 +124,6 @@ class VentralRootDetection(QDialog):
         self.parameters_labels = dict()
         for param_name in self.parameters.keys():
             label = QLabel(param_name)
-            # slider = QSlider(Qt.Orientation.Horizontal)
-            # slider.setMinimum(self.min_range)
-            # slider.setMaximum(self.max_range)
-            # slider.setValue(int(self.max_range/2))  # Initial value
-            # slider.setTickInterval(1)
-            # slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-            # slider.setTickPosition(QSlider.TickPosition.NoTicks)
-
             # Add text field
             field = QLineEdit()
 
@@ -140,18 +182,6 @@ class VentralRootDetection(QDialog):
         parameters = self.parameters
         if value is not None:
             parameters[param_name] = value
-            # if param_name == 'threshold':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 1, 20)
-            # if param_name == 'large_th_factor':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 5, 100)
-            # if param_name == 'vr_cutoff':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 0.5, 20)
-            # if param_name == 'movingaverage_window':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 100, 10000)
-            # if param_name == 'duration_th_secs':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 1, 10)
-            # if param_name == 'minimal_event_distance':
-            #     parameters[param_name] = self.map_range(value, self.min_range, self.max_range, 1, 10)
         else:
             parameters[param_name] = None
 
@@ -269,17 +299,6 @@ class VentralRootDetection(QDialog):
             th = np.std(data) * 5
         else:
             th = np.std(data) * parameters['threshold']
-
-        # # Remove large values
-        # max_th = np.median(data) + parameters['large_th_factor'] * np.std(data)
-        # max_idx = abs(data) > max_th
-        # if np.sum(max_idx) > 0:
-        #     # Replace very large values with new values
-        #     new_val = max_th * 0.5
-        #     data[max_idx] = new_val
-        #     print('++++ REMOVED VERY LARGE VALUES ++++')
-        #     print(f'max. threshold = {max_th:.2f} V')
-        #     print(f'substituted value = {new_val:.2f} V')
 
         # Compute envelope
         env = self.envelope(data=data, rate=self.fr, freq=parameters['vr_cutoff'])

@@ -1,4 +1,4 @@
-from PyQt6.QtGui import QFont, QAction, QColor
+from PyQt6.QtGui import QFont, QAction, QColor, QIntValidator, QDoubleValidator
 from PyQt6.QtCore import pyqtSignal, Qt, QEvent
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QWidget, QLabel, QVBoxLayout, \
     QMessageBox, QHBoxLayout, QSlider, QComboBox, QToolBar, QListWidget, QListWidgetItem, QFileDialog, QInputDialog, \
@@ -77,20 +77,6 @@ class MainWindow(QMainWindow):
         self.data_sets_list_y_offset = self.data_sets_list_context_menu.addAction("y offset")
 
         self.data_sets_list_context_menu.addSeparator()
-        self.data_sets_list_to_z_score = self.data_sets_list_context_menu.addAction("z-score")
-        self.data_sets_list_to_df_f = self.data_sets_list_context_menu.addAction("delta F over F")
-        self.data_sets_list_to_min_max = self.data_sets_list_context_menu.addAction("min max")
-
-        self.data_sets_list_context_menu.addSeparator()
-        self.filter_menu = self.data_sets_list_context_menu.addMenu('Filter')
-        self.filter_moving_average = self.filter_menu.addAction("Moving Average")
-        self.filter_diff = self.filter_menu.addAction("Differentiate")
-        self.filter_lowpass = self.filter_menu.addAction("Low Pass")
-        self.filter_highpass = self.filter_menu.addAction("High Pass")
-        self.filter_envelope = self.filter_menu.addAction("Envelope")
-        self.filter_down_sampling = self.filter_menu.addAction("Down Sampling")
-
-        self.data_sets_list_context_menu.addSeparator()
         self.style_menu = self.data_sets_list_context_menu.addMenu('Style')
         self.style_color = self.style_menu.addAction("Change Color")
         self.style_lw = self.style_menu.addAction("Line Width")
@@ -101,16 +87,10 @@ class MainWindow(QMainWindow):
 
         # The Toolbar
         self.toolbar = QToolBar()
-        # self.toolbar = MyToolbar()
         self.toolbar.setFloatable(False)
         self.toolbar.setMovable(False)
         self.toolbar.toggleViewAction().setEnabled(False)
         self.addToolBar(self.toolbar)
-
-        # Detect Peaks
-        # self.toolbar_peak_detection = QAction("Detect Peaks", self)
-        # self.toolbar_raw_action.setToolTip("Raw Data (R)")
-        # self.toolbar.addAction(self.toolbar_peak_detection)
 
         # The Mouse Position
         self.layout_labels = QHBoxLayout()
@@ -171,7 +151,6 @@ class MainWindow(QMainWindow):
         self.file_menu_new_viewer_file = self.file_menu.addAction('New ... (ctrl+n)')
         self.file_men_open_viewer_file = self.file_menu.addAction('Open ... (ctrl+o)')
         self.file_menu_save_viewer_file = self.file_menu.addAction('Save Viewer File (ctrl+s)')
-        # self.file_menu_save_viewer_file.setDisabled(True)
         self.file_menu.addSeparator()
         self.file_menu_import_csv = self.file_menu.addAction('Import csv file ...')
 
@@ -181,24 +160,32 @@ class MainWindow(QMainWindow):
         # Tools Menu
         self.tools_menu = self.menu.addMenu('Tools')
         self.tools_menu_open_video_viewer = self.tools_menu.addAction('Open Video Viewer')
-        # self.tools_menu_multiplot = self.tools_menu.addAction('Multi Plot')
-        # self.tools_menu_video_converter = self.tools_menu.addAction('Convert Video File')
-        # self.tools_menu_registration = self.tools_menu.addAction('Registration')
-        self.tools_menu_convert_csv = self.tools_menu.addAction('Convert csv files')
         self.tools_menu_csv_remove_column = self.tools_menu.addAction('Remove Column from csv file')
         self.tools_menu_convert_ventral_root = self.tools_menu.addAction('Convert Ventral Root Files')
         self.tools_menu_create_stimulus = self.tools_menu.addAction('Create Stimulus From File')
-        self.tools_menu_detect_vr = self.tools_menu.addAction('Ventral Root Event Detection')
-        # self.tools_menu_detect_peaks = self.tools_menu.addAction('Peak Detection')
+
+        # Utils Menu
+        self.utils_menu = self.menu.addMenu('Utils')
 
         # PLUGINS
-        self.plugins_menu = self.data_sets_list_context_menu.addMenu('Plugins')
-        self.plugins_menu_actions = []  # Keep track of actions dynamically
+        # Filter
+        self.plugins_filter_menu = self.data_sets_list_context_menu.addMenu('Filter')
+        self.plugins_filter_menu_actions = []  # Keep track of actions dynamically
+
+        # Transformations
+        self.plugins_transformation_menu = self.data_sets_list_context_menu.addMenu('Transformation')
+        self.plugins_transformation_menu_actions = []  # Keep track of actions dynamically
+
+    def populate_transformation_plugins_menu(self, plugins, callback):
+        self.plugins_transformation_menu.clear()
+        for plugin in plugins:
+            action = self.plugins_transformation_menu.addAction(plugin.name)
+            action.triggered.connect(lambda _, p=plugin: callback(p))
 
     def populate_filter_plugins_menu(self, plugins, callback):
-        self.plugins_menu.clear()
+        self.plugins_filter_menu.clear()
         for plugin in plugins:
-            action = self.plugins_menu.addAction(plugin.name)
+            action = self.plugins_filter_menu.addAction(plugin.name)
             action.triggered.connect(lambda _, p=plugin: callback(p))
 
     def add_tools_menu_plugins(self, plugins):
@@ -208,6 +195,20 @@ class MainWindow(QMainWindow):
         """
         for plugin in plugins:
             action = self.tools_menu.addAction(plugin.name)
+            if not plugin.available():
+                action.setEnabled(False)
+                reason = getattr(plugin, "unavailable_reason", "Plugin not available.")
+                action.setToolTip(reason)
+            else:
+                action.triggered.connect(plugin.apply)
+
+    def add_utils_menu_plugins(self, plugins):
+        """
+        Add all tool plugins to the Utils menu.
+        Disabled ones are visible but grayed out.
+        """
+        for plugin in plugins:
+            action = self.utils_menu.addAction(plugin.name)
             if not plugin.available():
                 action.setEnabled(False)
                 reason = getattr(plugin, "unavailable_reason", "Plugin not available.")
@@ -433,6 +434,78 @@ class MessageBox:
         if button == QMessageBox.StandardButton.Ok:
             print('yes')
             return
+
+
+# class DynamicInputDialog(QDialog):
+#     def __init__(self, title='Input Dialog', fields=None, parent=None):
+#         super().__init__(parent)
+#         self.setWindowTitle(title)
+#         self.fields = fields or {}
+#         self.inputs = {}  # key -> (widget, type_str)
+#
+#         layout = QVBoxLayout()
+#
+#         for label, (default, type_str) in self.fields.items():
+#             layout.addWidget(QLabel(label))
+#
+#             if type_str in ('file', 'dir'):
+#                 # File or directory picker
+#                 container = QHBoxLayout()
+#                 line_edit = QLineEdit(str(default))
+#                 button = QPushButton("Browse...")
+#                 container.addWidget(line_edit)
+#                 container.addWidget(button)
+#                 layout.addLayout(container)
+#
+#                 def open_dialog(_, le=line_edit, t=type_str):
+#                     if t == 'file':
+#                         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
+#                         if file_path:
+#                             le.setText(file_path)
+#                     else:
+#                         dir_path, _ = QFileDialog.getSaveFileName(self, "Select Directory", filter="CSV Files (*.csv)")
+#                         if dir_path:
+#                             if not dir_path.endswith('.csv'):
+#                                 dir_path += '.csv'
+#                             le.setText(dir_path)
+#
+#                 button.clicked.connect(open_dialog)
+#                 self.inputs[label] = (line_edit, type_str)
+#
+#             else:
+#                 # Regular input
+#                 line_edit = QLineEdit(str(default))
+#                 if type_str == 'int':
+#                     line_edit.setValidator(QIntValidator())
+#                 elif type_str == 'float':
+#                     line_edit.setValidator(QDoubleValidator())
+#                 self.inputs[label] = (line_edit, type_str)
+#                 layout.addWidget(line_edit)
+#
+#         self.add_ok_cancel_buttons(layout)
+#         self.setLayout(layout)
+#
+#     def get_inputs(self):
+#         result = {}
+#         for label, (widget, type_str) in self.inputs.items():
+#             value = widget.text()
+#             try:
+#                 if type_str == 'int':
+#                     result[label] = int(value)
+#                 elif type_str == 'float':
+#                     result[label] = float(value)
+#                 else:
+#                     result[label] = value  # string, file, dir
+#             except ValueError:
+#                 result[label] = None
+#         return result
+#
+#     def add_ok_cancel_buttons(self, layout):
+#         QBtn = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+#         buttonBox = QDialogButtonBox(QBtn)
+#         buttonBox.accepted.connect(self.accept)
+#         buttonBox.rejected.connect(self.reject)
+#         layout.addWidget(buttonBox)
 
 
 class SimpleInputDialog(QDialog):

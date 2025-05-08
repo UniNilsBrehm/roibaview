@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-
+import numpy as np
 
 
 class PyqtgraphSettings:
@@ -92,11 +92,8 @@ class DataPlotter:
                     name=plot_name,
                     skipFiniteCheck=True,
                     tip=None,
-                    # autoDownsample=True,
-                    # clipToView=True
                 )
-                # plot_data_item.setClipToView(True)
-                # plot_data_item.setDownsampling(auto=True)
+
                 # Add plot item to the plot widget
                 self.master_plot.addItem(plot_data_item)
             cc += 1

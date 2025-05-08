@@ -4,6 +4,7 @@ import os
 import inspect
 from roibaview.plugins.base import BasePlugin
 
+
 def load_plugins(context=None):
     plugin_dir = os.path.dirname(__file__)
     plugins = []
@@ -28,13 +29,6 @@ def load_plugins(context=None):
                             plugins.append(plugin)
                         except Exception as e:
                             print(f"Failed to instantiate plugin {obj.__name__}: {e}")
-                            # try:
-                            #     # Still add a placeholder plugin instance for disabled plugins
-                            #     plugin = obj()
-                            #     plugin._instantiation_error = str(e)
-                            #     plugins.append(plugin)
-                            # except Exception:
-                            #     print(f"Could not even create placeholder for {obj.__name__}")
                     except Exception as e:
                         print(f"Failed to instantiate plugin {obj.__name__}: {e}")
     return plugins

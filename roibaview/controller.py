@@ -8,11 +8,10 @@ from PyQt6.QtCore import pyqtSignal, QObject, Qt
 from PyQt6.QtGui import QPen, QBrush, QColor
 import pyqtgraph as pg
 from roibaview.data_handler import DataHandler, TransformData
-from roibaview.csv_handling import CSVHandler
-from roibaview.gui import BrowseFileDialog, InputDialog, SimpleInputDialog, ChangeStyle
+from roibaview.gui import BrowseFileDialog, InputDialog, SimpleInputDialog, ChangeStyle, MessageBox
 from roibaview.data_plotter import DataPlotter, PyqtgraphSettings
 # from roibaview.peak_detection import PeakDetection
-from roibaview.ventral_root_detection import VentralRootDetection
+# from roibaview.ventral_root_detection import VentralRootDetection
 from roibaview.custom_view_box import CustomViewBoxMenu
 from roibaview.registration import Registrator
 from roibaview.video_viewer import VideoViewer
@@ -108,16 +107,21 @@ class Controller(QObject):
 
         # Categorize them for use
         self.tool_plugins = [p for p in self.plugins if p.category == "tool"]
+        self.utils_plugins = [p for p in self.plugins if p.category == "utils"]
+
+        # Context Menu
         self.filter_plugins = [p for p in self.plugins if p.category == "filter"]
-        self.analysis_plugins = [p for p in self.plugins if p.category == "analysis"]
+        self.transformation_plugins = [p for p in self.plugins if p.category == "transformation"]
 
         # Register tools in Tools menu
         self.gui.add_tools_menu_plugins(self.tool_plugins)
-        self.gui.populate_filter_plugins_menu(self.filter_plugins, self.apply_filter_plugin)
 
-        # Optional: later populate filter right-click menu
-        # self.populate_filter_menu()
-        # (Optional) You can later use filter plugins similarly in context menus
+        # Register utils in Utils menu
+        self.gui.add_utils_menu_plugins(self.utils_plugins)
+
+        # Populate Context Menu Filter Plugins
+        self.gui.populate_filter_plugins_menu(self.filter_plugins, self.apply_filter_plugin)
+        self.gui.populate_transformation_plugins_menu(self.transformation_plugins, self.apply_filter_plugin)
 
     def apply_filter_plugin(self, plugin):
         if not self.selected_data_sets:
@@ -127,17 +131,26 @@ class Controller(QObject):
             data = self.data_handler.get_data_set(kind, name)
             meta = self.data_handler.get_data_set_meta_data(kind, name)
             result = plugin.apply(data, meta['sampling_rate'])
+            if type(result) is tuple:  # function returns two values, the second is the new sampling rate (down sampling)
+                fr = result[1]
+                result = result[0]
+            else:
+                fr = meta['sampling_rate']
             new_name = f"{name}_{plugin.name.replace(' ', '_')}"
-            self.data_handler.add_new_data_set(
+            already_exists = self.data_handler.add_new_data_set(
                 data_set_type=kind,
                 data_set_name=new_name,
                 data=result,
-                sampling_rate=meta['sampling_rate'],
+                sampling_rate=fr,
                 time_offset=0,
                 y_offset=0,
                 header=meta.get("roi_names", list(range(result.shape[1])))
             )
-            self.add_data_set_to_list(kind, new_name)
+            if already_exists:
+                data_set_name = new_name + '_new'
+                self.add_data_set_to_list(kind, data_set_name)
+            else:
+                self.add_data_set_to_list(kind, new_name)
 
     def _create_config_file(self):
         self.config = configparser.ConfigParser()
@@ -174,17 +187,6 @@ class Controller(QObject):
         self.gui.data_sets_list_export.triggered.connect(self.export_to_csv)
         self.gui.data_sets_list_time_offset.triggered.connect(self.time_offset)
         self.gui.data_sets_list_y_offset.triggered.connect(self.y_offset)
-        self.gui.data_sets_list_to_df_f.triggered.connect(lambda: self.context_menu('df_f'))
-        self.gui.data_sets_list_to_z_score.triggered.connect(lambda: self.context_menu('z'))
-        self.gui.data_sets_list_to_min_max.triggered.connect(lambda: self.context_menu('min_max'))
-
-        # Filter Submenu
-        self.gui.filter_moving_average.triggered.connect(lambda: self.filter_data('moving_average'))
-        self.gui.filter_diff.triggered.connect(lambda: self.filter_data('diff'))
-        self.gui.filter_lowpass.triggered.connect(lambda: self.filter_data('lowpass'))
-        self.gui.filter_highpass.triggered.connect(lambda: self.filter_data('highpass'))
-        self.gui.filter_envelope.triggered.connect(lambda: self.filter_data('env'))
-        self.gui.filter_down_sampling.triggered.connect(lambda: self.filter_data('ds'))
 
         # Style Submenu
         self.gui.style_color.triggered.connect(self.pick_color)
@@ -194,20 +196,18 @@ class Controller(QObject):
         # Video Viewer
         self.gui.tools_menu_open_video_viewer.triggered.connect(self.open_video_viewer)
         self.video_viewer.TimePoint.connect(self.connect_video_to_plot)
-        # Convert csv file
-        self.gui.tools_menu_convert_csv.triggered.connect(self.convert_csv_files)
+
         # Remove Column from csv file
         self.gui.tools_menu_csv_remove_column.triggered.connect(self.csv_remove_column)
-        # Video Converter
-        # self.gui.tools_menu_video_converter.triggered.connect(self.open_video_converter)
+
         # Convert Ventral Root
         self.gui.tools_menu_convert_ventral_root.triggered.connect(self.convert_ventral_root)
+
         # Create Stimulus from File
         self.gui.tools_menu_create_stimulus.triggered.connect(self.create_stimulus_from_file)
+
         # Ventral Root Event Detection
-        self.gui.tools_menu_detect_vr.triggered.connect(self._ventral_root_detection)
-        # Peak Detection
-        # self.gui.tools_menu_detect_peaks.triggered.connect(self._start_peak_detection)
+        # self.gui.tools_menu_detect_vr.triggered.connect(self._ventral_root_detection)
 
         # KeyBoard Bindings
         self.gui.key_pressed.connect(self.on_key_press)
@@ -296,23 +296,23 @@ class Controller(QObject):
             # Remove Selection Markers from Plot
             self.data_plotter.master_plot.removeItem(self.cut_out_region)
 
-    def _ventral_root_detection(self):
-        if len(self.selected_data_sets) > 0:
-            self.gui.freeze_gui(True)
-            data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
-            current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
-            meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
-
-            self.vr_detection = VentralRootDetection(
-                data=current_data_set,
-                fr=meta_data['sampling_rate'],
-                master_plot=self.data_plotter.master_plot,
-                roi=self.current_roi_idx,
-            )
-            self.vr_detection.show()
-            if self.vr_detection.exec() == QDialog.DialogCode.Accepted:
-                self.gui.freeze_gui(False)
-                self.vr_detection = None
+    # def _ventral_root_detection(self):
+    #     if len(self.selected_data_sets) > 0:
+    #         self.gui.freeze_gui(True)
+    #         data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
+    #         current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
+    #         meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
+    #
+    #         self.vr_detection = VentralRootDetection(
+    #             data=current_data_set,
+    #             fr=meta_data['sampling_rate'],
+    #             master_plot=self.data_plotter.master_plot,
+    #             roi=self.current_roi_idx,
+    #         )
+    #         self.vr_detection.show()
+    #         if self.vr_detection.exec() == QDialog.DialogCode.Accepted:
+    #             self.gui.freeze_gui(False)
+    #             self.vr_detection = None
 
     def export_to_csv(self):
         file_dir = self.file_browser.save_file_name('csv file, (*.csv *.txt)')
@@ -475,35 +475,6 @@ class Controller(QObject):
         csv_handler = CSVHandler(self.gui)
         csv_handler.remove_column_from_csv_file()
         print('YUHUUUU')
-
-    def convert_csv_files(self):
-        file_dir = self.file_browser.browse_file('csv file, (*.csv *.txt)')
-        if file_dir:
-            dialog = SimpleInputDialog('Convert csv file', 'Please enter delimiter of input file: ')
-            # if dialog.exec() == QDialog.DialogCode.Accepted:
-            if dialog.exec() == dialog.DialogCode.Accepted:
-                input_delimiter = dialog.get_input()
-            else:
-                return None
-
-            dialog = SimpleInputDialog('Convert csv file', 'Please enter delimiter of output file: ')
-            if dialog.exec() == dialog.DialogCode.Accepted:
-                output_delimiter = dialog.get_input()
-            else:
-                return None
-
-            if input_delimiter == 'tab':
-                input_file = pd.read_csv(file_dir, sep='\s+', index_col=False)
-            else:
-                input_file = pd.read_csv(file_dir, sep=input_delimiter, index_col=False)
-                # input_file = pd.read_csv(file_dir, index_col=False, delim_whitespace=True)
-
-            out_file_dir = self.file_browser.save_file_name('csv file, (*.csv)')
-            if out_file_dir:
-                try:
-                    input_file.to_csv(out_file_dir, sep=output_delimiter, index=False)
-                except TypeError:
-                    print('ERROR: "delimiter" must be a 1-character string')
 
     def connect_video_to_plot(self, time_point):
         for v in self.video_viewers:
@@ -822,7 +793,7 @@ class Controller(QObject):
                 time_offset = meta_data['time_offset']
                 y_offset = meta_data['y_offset']
                 try:
-                    time_points.append(self.data_transformer.compute_time_axis(r.shape[0], fr) + time_offset)
+                    time_points.append(self.data_handler.compute_time_axis(r.shape[0], fr) + time_offset)
                 except AttributeError:
                     from IPython import embed
                     embed()
@@ -836,7 +807,7 @@ class Controller(QObject):
                 fr = meta_data['sampling_rate']
                 time_offset = meta_data['time_offset']
                 y_offset = meta_data['y_offset']
-                global_time_points.append(self.data_transformer.compute_time_axis(r.shape[0], fr) + time_offset)
+                global_time_points.append(self.data_handler.compute_time_axis(r.shape[0], fr) + time_offset)
                 global_data.append(r + y_offset)
                 global_meta_data_list.append(meta_data)
 
@@ -892,7 +863,9 @@ class Controller(QObject):
             # check if the data set name already exists
             check_if_exists = self.data_handler.check_if_exists(data_set_type, data_set_name)
             if check_if_exists:
-                return None
+                MessageBox(title='ERROR', text='Data set with this name already exists! Will rename it.')
+                data_set_name = data_set_name + '_new'
+
             # Import csv file
             self.data_handler.import_csv(file_dir=file_dir, data_name=data_set_name, sampling_rate=fr, data_set_type=data_set_type)
 

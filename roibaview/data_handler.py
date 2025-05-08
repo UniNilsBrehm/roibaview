@@ -249,6 +249,11 @@ class DataHandler(QObject):
                 print('ERROR: Data set not found!')
                 return None
 
+    @staticmethod
+    def compute_time_axis(data_size, fr):
+        max_time = data_size / fr
+        return np.linspace(0, max_time, data_size)
+
 
 class TransformData(QObject):
     signal_data_transformed = pyqtSignal()
@@ -267,107 +272,50 @@ class TransformData(QObject):
 
         return down_sampled_data, new_fs
 
-    @staticmethod
-    def compute_time_axis(data_size, fr):
-        max_time = data_size / fr
-        return np.linspace(0, max_time, data_size)
+    # @staticmethod
+    # def to_z_score(data):
+    #     """ Compute Z-Score = (Data - Mean) / SD
+    #
+    #     :param data: numpy array (columns: ROIs, rows: data points over time)
+    #     :return: Data set with z-scored values
+    #     """
+    #     # Check if there is only one ROI (Column)
+    #     if data.shape[1] == 1:
+    #         data = data.flatten()
+    #     return (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
-    @staticmethod
-    def to_z_score(data):
-        """ Compute Z-Score = (Data - Mean) / SD
+    # @staticmethod
+    # def to_delta_f_over_f(data, fr, fbs_per=5, window=None):
+    #     """ Compute delta F over F for raw fluorescence values
+    #
+    #     :param data: numpy array (columns: ROIs, rows: data points over time)
+    #     :param fr: frame rate in seconds
+    #     :param fbs_per: percentile to calculate baseline (0.0 to 1.0)
+    #     :param window: window size in seconds for computing sliding percentile baseline (if None, no window is used)
+    #     :return:Delta F over F normalized data set
+    #     """
+    #     # This is using the pandas rolling method, so we need to convert the data to a DataFrame first
+    #     from IPython import embed
+    #     df = pd.DataFrame(data)
+    #     if window is None:
+    #         fbs = np.percentile(df, fbs_per, axis=0)
+    #     else:
+    #         per_window = int(window * fr)
+    #         quant = fbs_per / 100
+    #         # fbs = df.rolling(window=per_window, center=True, min_periods=0, axis=0).quantile(quant)
+    #         fbs = df.rolling(window=per_window, center=True, min_periods=0).quantile(quant)
+    #
+    #     df_over_f = (df - fbs) / fbs
+    #     return df_over_f.to_numpy()
 
-        :param data: numpy array (columns: ROIs, rows: data points over time)
-        :return: Data set with z-scored values
-        """
-        # Check if there is only one ROI (Column)
-        if data.shape[1] == 1:
-            data = data.flatten()
-        return (data - np.mean(data, axis=0)) / np.std(data, axis=0)
-
-    @staticmethod
-    def to_delta_f_over_f(data, fr, fbs_per=5, window=None):
-        """ Compute delta F over F for raw fluorescence values
-
-        :param data: numpy array (columns: ROIs, rows: data points over time)
-        :param fr: frame rate in seconds
-        :param fbs_per: percentile to calculate baseline (0.0 to 1.0)
-        :param window: window size in seconds for computing sliding percentile baseline (if None, no window is used)
-        :return:Delta F over F normalized data set
-        """
-        # This is using the pandas rolling method, so we need to convert the data to a DataFrame first
-        from IPython import embed
-        df = pd.DataFrame(data)
-        if window is None:
-            fbs = np.percentile(df, fbs_per, axis=0)
-        else:
-            per_window = int(window * fr)
-            quant = fbs_per / 100
-            # fbs = df.rolling(window=per_window, center=True, min_periods=0, axis=0).quantile(quant)
-            fbs = df.rolling(window=per_window, center=True, min_periods=0).quantile(quant)
-
-        df_over_f = (df - fbs) / fbs
-        return df_over_f.to_numpy()
-
-    @staticmethod
-    def to_min_max(data):
-        """ Compute min-max normalization to the range [0, 1]
-
-        :param data: numpy array (columns: ROIs, rows: data points over time)
-        :return: Data normalize to the range [0, 1]
-        """
-        return (data - np.min(data, axis=0)) / (np.max(data, axis=0) - np.min(data, axis=0))
-
-    @staticmethod
-    def filter_moving_average(data, fr, window):
-        window_size = int(window * fr)
-        # Make sure window size is odd
-        if window_size % 2 == 0:
-            window_size += 1
-
-        pad_width = window_size // 2
-        # Define the kernel
-        kernel = np.ones(window_size) / window_size
-        filtered_data = np.zeros_like(data)
-        for i in range(data.shape[1]):
-            trace = data[:, i]
-            # Pad the input array symmetrically
-            padded_array = np.pad(trace, pad_width, mode='symmetric')
-            filtered_data[:, i] = np.convolve(padded_array, kernel, mode='valid')
-
-        return filtered_data
-
-    @staticmethod
-    def filter_differentiate(data):
-        return np.diff(data, append=0, axis=0)
-
-    def filter_low_pass(self, data, cutoff, fs, order=2):
-        sos = self.butter_filter_design('lowpass', cutoff, fs, order=order)
-        return signal.sosfiltfilt(sos, data, axis=0)
-
-    def filter_high_pass(self, data, cutoff, fs, order=2):
-        sos = self.butter_filter_design('highpass', cutoff, fs, order=order)
-        return signal.sosfiltfilt(sos, data, axis=0)
-
-    @staticmethod
-    def butter_filter_design(filter_type, cutoff, fs, order=2):
-        nyq = 0.5 * fs
-        normal_cutoff = cutoff / nyq
-        if normal_cutoff >= 1:
-            normal_cutoff = 0.9999
-        # b, a = signal.butter(order, normal_cutoff, btype=filter_type, analog=False)
-        sos = signal.butter(order, normal_cutoff, btype=filter_type, output='sos')
-        return sos
-
-    @staticmethod
-    def envelope(data, freq, rate):
-        # Low pass filter the absolute values of the signal in both forward and reverse directions,
-        # resulting in zero-phase filtering.
-        sos = signal.butter(2, freq, 'lowpass', fs=rate, output='sos')
-        env = (np.sqrt(2) * signal.sosfiltfilt(sos, np.abs(data), axis=0)) ** 2
-
-        # Make sure that output has the correct format
-        # env = np.atleast_2d(env)
-        return env
+    # @staticmethod
+    # def to_min_max(data):
+    #     """ Compute min-max normalization to the range [0, 1]
+    #
+    #     :param data: numpy array (columns: ROIs, rows: data points over time)
+    #     :return: Data normalize to the range [0, 1]
+    #     """
+    #     return (data - np.min(data, axis=0)) / (np.max(data, axis=0) - np.min(data, axis=0))
 
     @staticmethod
     def prepare_data(data):
@@ -379,7 +327,3 @@ class TransformData(QObject):
             # otherwise transpose it
             new_data = data.T
         return new_data
-
-    # def envelope(self, data, lp_cutoff, fs):
-    #     sos = self.butter_filter_design('lowpass', lp_cutoff, fs=fs)
-    #     return np.sqrt(2) * signal.sosfiltfilt(sos, np.abs(data))

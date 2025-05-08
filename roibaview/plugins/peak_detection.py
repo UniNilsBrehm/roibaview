@@ -1,11 +1,12 @@
 import pyqtgraph as pg
 import numpy as np
-from PyQt6.QtCore import pyqtSignal, QObject, Qt
-from PyQt6.QtWidgets import QVBoxLayout, QSlider, QLabel, QWidget, QSpacerItem, QSizePolicy, QMessageBox, QDialog, QPushButton
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import QVBoxLayout, QSlider, QLabel, QSpacerItem, QSizePolicy, QMessageBox, QDialog, QPushButton
 from scipy import signal
 from roibaview.gui import BrowseFileDialog
 import pandas as pd
 from roibaview.plugins.base import BasePlugin
+
 
 class PeakDetectionPlugin(BasePlugin):
     name = "Peak Detection"
@@ -57,6 +58,7 @@ class PeakDetectionPlugin(BasePlugin):
         except Exception as e:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self.parent, "Peak Detection Error", str(e))
+
 
 # class PeakDetection(QWidget):
 class PeakDetection(QDialog):
