@@ -17,52 +17,52 @@ class VentralRootDetectionPlugin(BasePlugin):
     def __init__(self, config=None, parent=None):
         self.config = config
         self.parent = parent
-        self.roi_signal = getattr(parent, "signal_roi_idx_changed", None)  # Optional
+        self.roi_signal = getattr(parent, "signal_roi_idx_changed", None)
+        self.dialog = None
 
     def apply(self, *_):
         try:
-            # Get controller-level references from the GUI
             controller = getattr(self.parent, "controller", None)
-            if not controller:
-                raise RuntimeError("Controller not found in GUI context.")
+            if not controller or not controller.selected_data_sets:
+                raise RuntimeError("No controller or dataset selected.")
 
-            if not controller.selected_data_sets:
-                raise RuntimeError("No dataset selected.")
-
-            # Get current dataset and metadata
             name = controller.selected_data_sets[0]
             dtype = controller.selected_data_sets_type[0]
             roi = controller.current_roi_idx
-
             data = controller.data_handler.get_data_set(dtype, name)
             meta = controller.data_handler.get_data_set_meta_data(dtype, name)
             fr = meta["sampling_rate"]
-
-            # Get the main data plot
             master_plot = controller.data_plotter.master_plot
 
-            # Create the peak detection dialog
-            dialog = VentralRootDetection(
-                data=data + meta["y_offset"],  # match old behavior
+            self.dialog = VentralRootDetection(
+                data=data + meta["y_offset"],
                 fr=fr,
                 master_plot=master_plot,
                 roi=roi,
                 parent=self.parent
             )
 
-            # Sync with ROI selection signal
             if self.roi_signal:
-                self.roi_signal.connect(dialog.roi_changed)
-                dialog.finished.connect(lambda: self.roi_signal.disconnect(dialog.roi_changed))
+                self.roi_signal.connect(self.dialog.roi_changed)
 
-            dialog.exec()
+            self.dialog.finished.connect(self._on_dialog_closed)
+            self.dialog.show()
 
         except Exception as e:
-            from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self.parent, "Ventral Root Detection Error", str(e))
 
-class VentralRootDetection(QDialog):
+    def _on_dialog_closed(self):
+        if self.roi_signal and hasattr(self, 'dialog'):
+            try:
+                self.roi_signal.disconnect(self.dialog.roi_changed)
+            except Exception:
+                pass
+        if hasattr(self, 'dialog') and self.dialog:
+            self.dialog.deleteLater()
+            self.dialog = None
 
+
+class VentralRootDetection(QDialog):
     signal_roi_changed = pyqtSignal(int)
     main_window_closing = pyqtSignal()
     def __init__(self, data, fr, master_plot, roi, parent=None, **kwargs):
@@ -215,43 +215,43 @@ class VentralRootDetection(QDialog):
             plot_data_item_env = pg.PlotDataItem(
                 self.time_axis, self.env_trace,
                 pen=pg.mkPen(color=(0, 255, 0)),
-                name=f'env',
+                name='env',
                 skipFiniteCheck=True,
                 tip=None,
             )
             self.master_plot.addItem(plot_data_item_env)
 
-            # Plot Event Onset and Offset
-            plot_data_item = pg.ScatterPlotItem(
-                # self.time_axis[self.vr_events['onset_idx']], self.data_trace[self.vr_events['onset_idx']],
-                self.time_axis[self.vr_events['onset_idx']], self.env_trace[self.vr_events['onset_idx']],
-                pen=pg.mkPen(color=(255, 0, 0)),
-                brush=pg.mkBrush(color=(255, 0, 0)),
-                size=50,
-                symbol='arrow_down',
-                name=f'event_onset',
-                skipFiniteCheck=True,
-                tip=None,
-                hoverable=True,
-                hoverSize=100
-            )
-            # Add plot item to the plot widget
-            self.master_plot.addItem(plot_data_item)
+            # Plot event onsets/offsets only if present
+            if 'onset_idx' in self.vr_events and 'offset_idx' in self.vr_events:
+                if len(self.vr_events['onset_idx']) > 0:
+                    onset_plot = pg.ScatterPlotItem(
+                        self.time_axis[self.vr_events['onset_idx']], self.env_trace[self.vr_events['onset_idx']],
+                        pen=pg.mkPen(color=(255, 0, 0)),
+                        brush=pg.mkBrush(color=(255, 0, 0)),
+                        size=50,
+                        symbol='arrow_down',
+                        name='event_onset',
+                        skipFiniteCheck=True,
+                        tip=None,
+                        hoverable=True,
+                        hoverSize=100
+                    )
+                    self.master_plot.addItem(onset_plot)
 
-            plot_data_item2 = pg.ScatterPlotItem(
-                self.time_axis[self.vr_events['offset_idx']], self.env_trace[self.vr_events['offset_idx']],
-                pen=pg.mkPen(color=(0, 0, 255)),
-                brush=pg.mkBrush(color=(0, 0, 255)),
-                size=50,
-                symbol='arrow_down',
-                name=f'event_offset',
-                skipFiniteCheck=True,
-                tip=None,
-                hoverable=True,
-                hoverSize=100
-            )
-            # Add plot item to the plot widget
-            self.master_plot.addItem(plot_data_item2)
+                if len(self.vr_events['offset_idx']) > 0:
+                    offset_plot = pg.ScatterPlotItem(
+                        self.time_axis[self.vr_events['offset_idx']], self.env_trace[self.vr_events['offset_idx']],
+                        pen=pg.mkPen(color=(0, 0, 255)),
+                        brush=pg.mkBrush(color=(0, 0, 255)),
+                        size=50,
+                        symbol='arrow_down',
+                        name='event_offset',
+                        skipFiniteCheck=True,
+                        tip=None,
+                        hoverable=True,
+                        hoverSize=100
+                    )
+                    self.master_plot.addItem(offset_plot)
 
     def set_parameters(self):
         self.parameters['threshold'] = 5  # times std
@@ -274,8 +274,12 @@ class VentralRootDetection(QDialog):
 
     @staticmethod
     def envelope(data, rate, freq):
-        # Low pass filter the absolute values of the signal in both forward and reverse directions,
-        # resulting in zero-phase filtering.
+        nyquist = rate / 2
+        if freq >= nyquist:
+            freq = nyquist * 0.99  # Clamp just below Nyquist
+        if freq <= 0:
+            freq = nyquist * 0.1  # Ensure it's > 0
+
         sos = sig.butter(2, freq, 'lowpass', fs=rate, output='sos')
         env = (np.sqrt(2) * sig.sosfiltfilt(sos, np.abs(data))) ** 2
         return env
@@ -340,6 +344,10 @@ class VentralRootDetection(QDialog):
         merged_onset_times = []
         merged_offset_times = []
 
+        if not events:
+            # No events detected, clear result and exit early
+            self.vr_events.clear()
+            return
         # Initialize the first event as the current event to merge
         current_onset_time, current_offset_time, current_onset_index, current_offset_index = events[0]
 
@@ -377,20 +385,21 @@ class VentralRootDetection(QDialog):
         self.vr_events['offset_times'] = merged_offset_times
 
     def closeEvent(self, event):
-        if self.main_window_running:
-            reply = QMessageBox.question(
-                self, 'Message',
-                "Are you sure to quit?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
-            )
+        self._cleanup()
+        self.done(QDialog.DialogCode.Accepted)
+        event.accept()
+        # import gc
+        # gc.collect()
+        # print("Remaining VentralRootDetection instances:",
+        #       [o for o in gc.get_objects() if isinstance(o, VentralRootDetection)])
 
-            if reply == QMessageBox.StandardButton.Yes:
-                # Here you can perform actions before closing the window
-                self.clear_plot()
-                self.done(QDialog.DialogCode.Accepted)
-                event.accept()
-            else:
-                event.ignore()
-        else:
-            self.done(QDialog.DialogCode.Accepted)
-            event.accept()
+    def _cleanup(self):
+        try:
+            if self.parent() and hasattr(self.parent(), "signal_roi_idx_changed"):
+                self.parent().signal_roi_idx_changed.disconnect(self.roi_changed)
+        except Exception:
+            pass
+        self.clear_plot()
+
+    # def __del__(self):
+    #     print("VentralRootDetection dialog deleted.")

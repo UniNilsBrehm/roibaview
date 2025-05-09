@@ -15,50 +15,48 @@ class PeakDetectionPlugin(BasePlugin):
 
     def __init__(self, config=None, parent=None):
         self.config = config
-        self.parent = parent
-        self.roi_signal = getattr(parent, "signal_roi_idx_changed", None)  # Optional
+        self.parent = parent  # mostly the main gui
+        self.dialog = None
 
     def apply(self, *_):
         try:
-            # Get controller-level references from the GUI
+            # Get the controller (connected to the gui)
             controller = getattr(self.parent, "controller", None)
             if not controller:
                 raise RuntimeError("Controller not found in GUI context.")
-
             if not controller.selected_data_sets:
                 raise RuntimeError("No dataset selected.")
 
-            # Get current dataset and metadata
             name = controller.selected_data_sets[0]
             dtype = controller.selected_data_sets_type[0]
             roi = controller.current_roi_idx
-
             data = controller.data_handler.get_data_set(dtype, name)
             meta = controller.data_handler.get_data_set_meta_data(dtype, name)
             fr = meta["sampling_rate"]
-
-            # Get the main data plot
             master_plot = controller.data_plotter.master_plot
 
-            # Create the peak detection dialog
-            dialog = PeakDetection(
-                data=data + meta["y_offset"],  # match old behavior
+            self.dialog = PeakDetection(
+                data=data + meta["y_offset"],
                 fr=fr,
                 master_plot=master_plot,
                 roi=roi,
-                parent=self.parent
+                parent=self.parent,
+                controller=controller
             )
 
-            # Sync with ROI selection signal
-            if self.roi_signal:
-                self.roi_signal.connect(dialog.roi_changed)
-                dialog.finished.connect(lambda: self.roi_signal.disconnect(dialog.roi_changed))
+            # Connect signal and cleanup handler
+            controller.signal_roi_idx_changed.connect(self.dialog.roi_changed)
+            self.dialog.finished.connect(self._on_dialog_closed)  # cleanup
 
-            dialog.exec()
+            self.dialog.show()
 
         except Exception as e:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self.parent, "Peak Detection Error", str(e))
+
+    def _on_dialog_closed(self):
+        self.dialog.deleteLater()
+        self.dialog = None
 
 
 # class PeakDetection(QWidget):
@@ -67,9 +65,9 @@ class PeakDetection(QDialog):
     signal_roi_changed = pyqtSignal(int)
     main_window_closing = pyqtSignal()
 
-    def __init__(self, data, fr, master_plot, roi, parent=None, **kwargs):
+    def __init__(self, data, fr, master_plot, roi, parent=None, controller=None, **kwargs):
         super().__init__(parent)
-
+        self.controller = controller  # Store controller
         self.roi_idx = roi
         self.data = data  # this is the data set
         self.data_trace = self.data[:, self.roi_idx]  # this is the roi trace
@@ -108,12 +106,12 @@ class PeakDetection(QDialog):
         self.main_window_running = False
         self.close()
 
-    def roi_changed(self, new_roi_idx):
-        print('ROI CHANGED')
-        self.roi_idx = new_roi_idx
-        self.data_trace = self.data[:, self.roi_idx]
-        self.peaks['times'], self.peaks['idx'], self.peaks['props'] = self.find_peaks(parameters=self.parameters)
-        self.update_plot()
+    def roi_changed(self):
+        if self.controller:
+            self.roi_idx = self.controller.current_roi_idx
+            self.data_trace = self.data[:, self.roi_idx]
+            self.peaks['times'], self.peaks['idx'], self.peaks['props'] = self.find_peaks(parameters=self.parameters)
+            self.update_plot()
 
     def _init_ui(self):
         layout = QVBoxLayout()
@@ -180,12 +178,12 @@ class PeakDetection(QDialog):
         self.update_plot()
 
     def clear_plot(self):
-        # check if there is already roi data plotted and remove it
-        item_list = self.master_plot.items.copy()
-        for item in item_list:
-            if item.name() is not None:
-                if item.name().startswith('peaks'):
-                    self.master_plot.removeItem(item)
+        for item in self.master_plot.items[:]:
+            name = item.name()
+            # print(f"Checking item: {name}")
+            if name and name.startswith("peaks_roi_"):
+                # print(f"Removing item: {name}")
+                self.master_plot.removeItem(item)
 
     def update_plot(self):
         # Check if there is already roi data plotted and remove it
@@ -199,7 +197,8 @@ class PeakDetection(QDialog):
             brush=pg.mkBrush(color=(255, 0, 0)),
             size=50,
             symbol='arrow_down',
-            name=f'peaks',
+            # name=f'peaks',
+            name=f'peaks_roi_{self.roi_idx}',  # unique name
             skipFiniteCheck=True,
             tip=None,
             hoverable=True,
@@ -241,7 +240,6 @@ class PeakDetection(QDialog):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
-
             if reply == QMessageBox.StandardButton.Yes:
                 self._cleanup_on_close()
                 self.done(QDialog.DialogCode.Accepted)
@@ -254,7 +252,8 @@ class PeakDetection(QDialog):
             event.accept()
 
     def _cleanup_on_close(self):
-        """Disconnects signals and clears peak visuals."""
+        """Disconnect signals, remove peak markers, and prepare dialog for deletion."""
+        # Disconnect internal signals
         try:
             self.signal_roi_changed.disconnect(self.roi_changed)
         except Exception:
@@ -265,4 +264,15 @@ class PeakDetection(QDialog):
         except Exception:
             pass
 
+        # Disconnect controller signal
+        if hasattr(self, "controller") and self.controller:
+            try:
+                self.controller.signal_roi_idx_changed.disconnect(self.roi_changed)
+            except Exception:
+                pass
+
+        # Remove any plotted peak markers
         self.clear_plot()
+
+    # def __del__(self):
+    #     print("PLUGIN dialog deleted.")

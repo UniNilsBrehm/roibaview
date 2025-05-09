@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import tempfile
 from PyQt6.QtCore import pyqtSignal, QObject
-from scipy import signal
 from roibaview.gui_utils import MessageBox
 from scipy.signal import decimate, resample
 
@@ -267,75 +266,30 @@ class DataHandler(QObject):
         return np.linspace(0, max_time, data_size)
 
 
-class TransformData(QObject):
-    signal_data_transformed = pyqtSignal()
-
-    def __init__(self):
-        QObject.__init__(self)
-
-    @staticmethod
-    def down_sampling(data, ds_factor, fs):
-        # New sampling rate
-        new_fs = fs / ds_factor
-        # new_samples = int(data.shape[0] / ds_factor)
-        # down_sampled_data = resample(data, new_samples)
-        # Apply decimate function to downsample the data
-        down_sampled_data = decimate(data, ds_factor, axis=0)
-
-        return down_sampled_data, new_fs
-
-    # @staticmethod
-    # def to_z_score(data):
-    #     """ Compute Z-Score = (Data - Mean) / SD
-    #
-    #     :param data: numpy array (columns: ROIs, rows: data points over time)
-    #     :return: Data set with z-scored values
-    #     """
-    #     # Check if there is only one ROI (Column)
-    #     if data.shape[1] == 1:
-    #         data = data.flatten()
-    #     return (data - np.mean(data, axis=0)) / np.std(data, axis=0)
-
-    # @staticmethod
-    # def to_delta_f_over_f(data, fr, fbs_per=5, window=None):
-    #     """ Compute delta F over F for raw fluorescence values
-    #
-    #     :param data: numpy array (columns: ROIs, rows: data points over time)
-    #     :param fr: frame rate in seconds
-    #     :param fbs_per: percentile to calculate baseline (0.0 to 1.0)
-    #     :param window: window size in seconds for computing sliding percentile baseline (if None, no window is used)
-    #     :return:Delta F over F normalized data set
-    #     """
-    #     # This is using the pandas rolling method, so we need to convert the data to a DataFrame first
-    #     from IPython import embed
-    #     df = pd.DataFrame(data)
-    #     if window is None:
-    #         fbs = np.percentile(df, fbs_per, axis=0)
-    #     else:
-    #         per_window = int(window * fr)
-    #         quant = fbs_per / 100
-    #         # fbs = df.rolling(window=per_window, center=True, min_periods=0, axis=0).quantile(quant)
-    #         fbs = df.rolling(window=per_window, center=True, min_periods=0).quantile(quant)
-    #
-    #     df_over_f = (df - fbs) / fbs
-    #     return df_over_f.to_numpy()
-
-    # @staticmethod
-    # def to_min_max(data):
-    #     """ Compute min-max normalization to the range [0, 1]
-    #
-    #     :param data: numpy array (columns: ROIs, rows: data points over time)
-    #     :return: Data normalize to the range [0, 1]
-    #     """
-    #     return (data - np.min(data, axis=0)) / (np.max(data, axis=0) - np.min(data, axis=0))
-
-    @staticmethod
-    def prepare_data(data):
-        # Since hdf5 and numpy like their data structured differently, we have to transform it
-        # Check if there is only one ROI (Column)
-        if data.shape[1] == 1:
-            new_data = data.flatten()
-        else:
-            # otherwise transpose it
-            new_data = data.T
-        return new_data
+# class TransformData(QObject):
+#     signal_data_transformed = pyqtSignal()
+#
+#     def __init__(self):
+#         QObject.__init__(self)
+#
+#     @staticmethod
+#     def down_sampling(data, ds_factor, fs):
+#         # New sampling rate
+#         new_fs = fs / ds_factor
+#         # new_samples = int(data.shape[0] / ds_factor)
+#         # down_sampled_data = resample(data, new_samples)
+#         # Apply decimate function to downsample the data
+#         down_sampled_data = decimate(data, ds_factor, axis=0)
+#
+#         return down_sampled_data, new_fs
+#
+#     @staticmethod
+#     def prepare_data(data):
+#         # Since hdf5 and numpy like their data structured differently, we have to transform it
+#         # Check if there is only one ROI (Column)
+#         if data.shape[1] == 1:
+#             new_data = data.flatten()
+#         else:
+#             # otherwise transpose it
+#             new_data = data.T
+#         return new_data

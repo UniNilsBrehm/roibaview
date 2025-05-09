@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QMessageBox, QListWidgetItem, QDialog, QApplication
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
 from PyQt6.QtGui import QBrush, QColor
 import pyqtgraph as pg
-from roibaview.data_handler import DataHandler, TransformData
+from roibaview.data_handler import DataHandler
 from roibaview.gui_utils import SimpleInputDialog, BrowseFileDialog, InputDialog, ChangeStyle, MessageBox
 from roibaview.data_plotter import DataPlotter, PyqtgraphSettings
 from roibaview.registration import Registrator
@@ -41,9 +41,6 @@ class Controller(QObject):
         self.selected_data_sets_rows = []
         self.selected_data_sets_items = []
         self.current_roi_idx = 0
-
-        # Get a Data Transformer
-        self.data_transformer = TransformData()
 
         # View Box Right Click Context Menu
         # Hide "Plot Options"
@@ -612,9 +609,7 @@ class Controller(QObject):
                 try:
                     time_points.append(self.data_handler.compute_time_axis(r.shape[0], fr) + time_offset)
                 except AttributeError:
-                    from IPython import embed
-                    embed()
-                    exit()
+                    return
 
                 roi_data.append(r + y_offset)
                 meta_data_list.append(meta_data)

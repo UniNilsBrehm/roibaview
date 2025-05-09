@@ -3,7 +3,6 @@ from roibaview.gui_utils import DynamicInputDialog
 from PyQt6.QtWidgets import QDialog, QMessageBox
 import pandas as pd
 import os
-from pathlib import Path
 
 
 class ConvertCSVFile(BasePlugin):
