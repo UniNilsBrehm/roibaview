@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QUrl
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QPushButton, QFileDialog, QGraphicsItemGroup
 import pyqtgraph as pg
 from pyqtgraph import ImageView
-from roibaview.gui import SimpleInputDialog
+from roibaview.gui_utils import SimpleInputDialog
 from roifile import ImagejRoi
 import numpy as np
 

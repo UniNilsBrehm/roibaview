@@ -1,10 +1,9 @@
-from PyQt6.QtGui import QFont, QAction, QColor, QIntValidator, QDoubleValidator
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import pyqtSignal, Qt, QEvent
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QWidget, QLabel, QVBoxLayout, \
-    QMessageBox, QHBoxLayout, QSlider, QComboBox, QToolBar, QListWidget, QListWidgetItem, QFileDialog, QInputDialog, \
-    QScrollArea, QMenu, QLineEdit, QDialog, QCheckBox, QDialogButtonBox, QColorDialog
+    QMessageBox, QHBoxLayout, QComboBox, QToolBar, QListWidget, \
+    QScrollArea, QMenu
 import pyqtgraph as pg
-import os
 
 
 class MainWindow(QMainWindow):
@@ -160,7 +159,6 @@ class MainWindow(QMainWindow):
         # Tools Menu
         self.tools_menu = self.menu.addMenu('Tools')
         self.tools_menu_open_video_viewer = self.tools_menu.addAction('Open Video Viewer')
-        self.tools_menu_csv_remove_column = self.tools_menu.addAction('Remove Column from csv file')
         self.tools_menu_convert_ventral_root = self.tools_menu.addAction('Convert Ventral Root Files')
         self.tools_menu_create_stimulus = self.tools_menu.addAction('Create Stimulus From File')
 
@@ -195,6 +193,11 @@ class MainWindow(QMainWindow):
         """
         for plugin in plugins:
             action = self.tools_menu.addAction(plugin.name)
+
+            # Assign shortcut if plugin defines one
+            if hasattr(plugin, "shortcut"):
+                action.setShortcut(plugin.shortcut)
+
             if not plugin.available():
                 action.setEnabled(False)
                 reason = getattr(plugin, "unavailable_reason", "Plugin not available.")
@@ -209,6 +212,11 @@ class MainWindow(QMainWindow):
         """
         for plugin in plugins:
             action = self.utils_menu.addAction(plugin.name)
+
+            # Assign shortcut if plugin defines one
+            if hasattr(plugin, "shortcut"):
+                action.setShortcut(plugin.shortcut)
+
             if not plugin.available():
                 action.setEnabled(False)
                 reason = getattr(plugin, "unavailable_reason", "Plugin not available.")
@@ -241,331 +249,3 @@ class MainWindow(QMainWindow):
         msg_box.setDefaultButton(QMessageBox.StandardButton.Save)
         retval = msg_box.exec()
         return retval
-
-
-class BrowseFileDialog(QFileDialog):
-
-    def __init__(self, main_gui):
-        QFileDialog.__init__(self)
-        self.master = main_gui
-        self.default_dir = 'C:/'
-        # self.file_format = 'csv file, (*.csv)'
-
-    def browse_file(self, file_format):
-        file_dir = self.getOpenFileName(self.master, 'Open File', self.default_dir, file_format)[0]
-        # change default dir to current dir
-        self.default_dir = os.path.split(file_dir)[0]
-        return file_dir
-
-    def save_file_name(self, file_format):
-        file_dir = self.getSaveFileName(self.master, 'Open File', self.default_dir, file_format)[0]
-        # change default dir to current dir
-        self.default_dir = os.path.split(file_dir)[0]
-        return file_dir
-
-    def browse_directory(self):
-        return self.getExistingDirectory()
-
-
-class InputDialog(QDialog):
-    def __init__(self, dialog_type,  parent=None):
-        super().__init__(parent)
-        self.dialog_type = dialog_type
-        self.fields = dict()
-        if self.dialog_type == 'import_csv':
-            self._set_gui__import_csv_dialog()
-        elif self.dialog_type == 'df_over_f':
-            self._set_gui_delta_f_over_f_dialog()
-        elif self.dialog_type == 'moving_average':
-            self._set_gui_moving_average_dialog()
-        elif self.dialog_type == 'butter':
-            self._set_gui_butter_filter_dialog()
-        elif self.dialog_type == 'rename':
-            self._set_gui_rename_data_set()
-        elif self.dialog_type == 'stimulus':
-            self._set_gui_stimulus_dialog()
-        elif self.dialog_type == 'ds':
-            self._set_gui_ds_dialog()
-
-    def get_input(self):
-        # Return the entered settings
-        output = dict()
-        for k in self.fields:
-            if k == 'is_global':
-                output[k] = self.fields[k].isChecked()
-            else:
-                output[k] = self.fields[k].text()
-        return output
-
-    def _set_gui_ds_dialog(self):
-        self.setWindowTitle("Settings")
-        layout = QVBoxLayout()
-        # Create input fields
-        self.fields['ds_factor'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("Down Sampling Factor:"))
-        layout.addWidget(self.fields['ds_factor'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui_moving_average_dialog(self):
-        self.setWindowTitle("Settings")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['window'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("Window for moving average [s]:"))
-        layout.addWidget(self.fields['window'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui_stimulus_dialog(self):
-        self.setWindowTitle("Settings")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['name'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("Name: "))
-        layout.addWidget(self.fields['name'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui_butter_filter_dialog(self):
-        self.setWindowTitle("Settings")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['cutoff'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("cut off frequency [Hz]:"))
-        layout.addWidget(self.fields['cutoff'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui_delta_f_over_f_dialog(self):
-        self.setWindowTitle("Settings")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['fbs_per'] = QLineEdit()
-        self.fields['fbs_window'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("Percentile for baseline [%]:"))
-        layout.addWidget(self.fields['fbs_per'])
-        layout.addWidget(QLabel("Window Size for baseline [s]:"))
-        layout.addWidget(self.fields['fbs_window'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui__import_csv_dialog(self):
-        self.setWindowTitle("Settings")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['data_set_name'] = QLineEdit()
-        self.fields['fr'] = QLineEdit()
-        self.fields['is_global'] = QCheckBox()
-
-        # Add labels
-        layout.addWidget(QLabel("Data Name:"))
-        layout.addWidget(self.fields['data_set_name'])
-        layout.addWidget(QLabel("Sampling Rate:"))
-        layout.addWidget(self.fields['fr'])
-        layout.addWidget(QLabel("Global Data Set:"))
-        layout.addWidget(self.fields['is_global'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def _set_gui_rename_data_set(self):
-        self.setWindowTitle("Rename Data Set")
-
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.fields['data_set_name'] = QLineEdit()
-
-        # Add labels
-        layout.addWidget(QLabel("Data Name:"))
-        layout.addWidget(self.fields['data_set_name'])
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def add_ok_cancel_buttons(self, layout):
-        QBtn = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        buttonBox = QDialogButtonBox(QBtn)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
-        layout.addWidget(buttonBox)
-
-
-class MessageBox:
-    def __init__(self, title, text):
-        dlg = QMessageBox()
-        dlg.setWindowTitle(title)
-        dlg.setText(text)
-        dlg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        button = dlg.exec()
-        if button == QMessageBox.StandardButton.Ok:
-            print('yes')
-            return
-
-
-# class DynamicInputDialog(QDialog):
-#     def __init__(self, title='Input Dialog', fields=None, parent=None):
-#         super().__init__(parent)
-#         self.setWindowTitle(title)
-#         self.fields = fields or {}
-#         self.inputs = {}  # key -> (widget, type_str)
-#
-#         layout = QVBoxLayout()
-#
-#         for label, (default, type_str) in self.fields.items():
-#             layout.addWidget(QLabel(label))
-#
-#             if type_str in ('file', 'dir'):
-#                 # File or directory picker
-#                 container = QHBoxLayout()
-#                 line_edit = QLineEdit(str(default))
-#                 button = QPushButton("Browse...")
-#                 container.addWidget(line_edit)
-#                 container.addWidget(button)
-#                 layout.addLayout(container)
-#
-#                 def open_dialog(_, le=line_edit, t=type_str):
-#                     if t == 'file':
-#                         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
-#                         if file_path:
-#                             le.setText(file_path)
-#                     else:
-#                         dir_path, _ = QFileDialog.getSaveFileName(self, "Select Directory", filter="CSV Files (*.csv)")
-#                         if dir_path:
-#                             if not dir_path.endswith('.csv'):
-#                                 dir_path += '.csv'
-#                             le.setText(dir_path)
-#
-#                 button.clicked.connect(open_dialog)
-#                 self.inputs[label] = (line_edit, type_str)
-#
-#             else:
-#                 # Regular input
-#                 line_edit = QLineEdit(str(default))
-#                 if type_str == 'int':
-#                     line_edit.setValidator(QIntValidator())
-#                 elif type_str == 'float':
-#                     line_edit.setValidator(QDoubleValidator())
-#                 self.inputs[label] = (line_edit, type_str)
-#                 layout.addWidget(line_edit)
-#
-#         self.add_ok_cancel_buttons(layout)
-#         self.setLayout(layout)
-#
-#     def get_inputs(self):
-#         result = {}
-#         for label, (widget, type_str) in self.inputs.items():
-#             value = widget.text()
-#             try:
-#                 if type_str == 'int':
-#                     result[label] = int(value)
-#                 elif type_str == 'float':
-#                     result[label] = float(value)
-#                 else:
-#                     result[label] = value  # string, file, dir
-#             except ValueError:
-#                 result[label] = None
-#         return result
-#
-#     def add_ok_cancel_buttons(self, layout):
-#         QBtn = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-#         buttonBox = QDialogButtonBox(QBtn)
-#         buttonBox.accepted.connect(self.accept)
-#         buttonBox.rejected.connect(self.reject)
-#         layout.addWidget(buttonBox)
-
-
-class SimpleInputDialog(QDialog):
-    """
-    That's how you call it:
-        dialog = SimpleInputDialog(title='Settings', text='Please enter some stuff: ')
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            received = dialog.get_input()
-        else:
-            return None
-    """
-    def __init__(self, title, text, default_value=0,  parent=None):
-        super().__init__(parent)
-        self.title = title
-        self.text = text
-        self.default_value = default_value
-
-        self.setWindowTitle(self.title)
-        layout = QVBoxLayout()
-
-        # Create input fields
-        self.user_input = QLineEdit()
-        self.user_input.setText(str(self.default_value))
-
-        # Add labels
-        layout.addWidget(QLabel(self.text))
-        layout.addWidget(self.user_input)
-
-        # Add OK and Cancel buttons
-        self.add_ok_cancel_buttons(layout)
-        self.setLayout(layout)
-
-    def get_input(self):
-        # Return the entered settings
-        output = self.user_input.text()
-        return output
-
-    def add_ok_cancel_buttons(self, layout):
-        QBtn = QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        buttonBox = QDialogButtonBox(QBtn)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
-        layout.addWidget(buttonBox)
-
-
-class ChangeStyle(QWidget):
-    def __init__(self):
-        super().__init__()
-
-    def get_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            # print(f"Selected color: {color.name()}")
-            pass
-        return color.name()
-
-    def get_lw(self):
-        dialog = SimpleInputDialog(title='Settings', text='Line Width: ')
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            return float(dialog.get_input())
-        else:
-            return None
-

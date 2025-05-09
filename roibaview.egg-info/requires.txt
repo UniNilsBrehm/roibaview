@@ -8,4 +8,5 @@ tifftools
 tifffile
 opencv-python
 ffmpy
+joblib
 roifile

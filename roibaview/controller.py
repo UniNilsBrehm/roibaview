@@ -3,19 +3,15 @@ import numpy as np
 import pandas as pd
 import configparser
 from datetime import datetime
-from PyQt6.QtWidgets import QMessageBox, QListWidget, QListWidgetItem, QDialog, QApplication
+from PyQt6.QtWidgets import QMessageBox, QListWidgetItem, QDialog, QApplication
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
-from PyQt6.QtGui import QPen, QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor
 import pyqtgraph as pg
 from roibaview.data_handler import DataHandler, TransformData
-from roibaview.gui import BrowseFileDialog, InputDialog, SimpleInputDialog, ChangeStyle, MessageBox
+from roibaview.gui_utils import SimpleInputDialog, BrowseFileDialog, InputDialog, ChangeStyle, MessageBox
 from roibaview.data_plotter import DataPlotter, PyqtgraphSettings
-# from roibaview.peak_detection import PeakDetection
-# from roibaview.ventral_root_detection import VentralRootDetection
-from roibaview.custom_view_box import CustomViewBoxMenu
 from roibaview.registration import Registrator
 from roibaview.video_viewer import VideoViewer
-# from roibaview.video_converter import VideoConverter
 from roibaview.plugins.loader import load_plugins
 
 
@@ -49,10 +45,6 @@ class Controller(QObject):
         # Get a Data Transformer
         self.data_transformer = TransformData()
 
-        # # Replace View Box menu
-        # self.view_box = self.gui.trace_plot_item.getViewBox()
-        # self.view_box.menu = CustomViewBoxMenu(self.view_box)
-
         # View Box Right Click Context Menu
         # Hide "Plot Options"
         self.gui.trace_plot_item.ctrlMenu.menuAction().setVisible(False)
@@ -68,9 +60,6 @@ class Controller(QObject):
         # Get a File Browser
         self.file_browser = BrowseFileDialog(self.gui)
 
-        # Get a Peak Detector
-        # self.peak_detection = None
-
         # Get a VR Detector
         self.vr_detection = None
 
@@ -82,8 +71,6 @@ class Controller(QObject):
         self.connections()
 
         # KeyBoard Bindings
-        # self.gui.key_pressed.connect(self.on_key_press)
-        # self.gui.key_released.connect(self.on_key_release)
         self.gui.trace_plot_item.scene().sigMouseMoved.connect(self.mouse_moved)
 
         self.pyqtgraph_settings = PyqtgraphSettings()
@@ -169,7 +156,6 @@ class Controller(QObject):
         # DataSets List
         # Connect item selection changed signal
         self.gui.data_sets_list.itemSelectionChanged.connect(self.data_set_selection_changed)
-        # self.gui.data_sets_list.itemActivated.connect(lambda: print('CLICK'))
 
         # Arrow Buttons
         self.gui.next_button.clicked.connect(self.next_roi)
@@ -177,7 +163,6 @@ class Controller(QObject):
 
         # ROI changed
         self.signal_roi_idx_changed.connect(lambda: self.update_plots(change_global=False))
-        # self.signal_roi_idx_changed.connect(self.check_peak_detector)
 
         # Context Menu
         self.gui.data_sets_list_rename.triggered.connect(self.rename_data_set)
@@ -197,17 +182,11 @@ class Controller(QObject):
         self.gui.tools_menu_open_video_viewer.triggered.connect(self.open_video_viewer)
         self.video_viewer.TimePoint.connect(self.connect_video_to_plot)
 
-        # Remove Column from csv file
-        self.gui.tools_menu_csv_remove_column.triggered.connect(self.csv_remove_column)
-
         # Convert Ventral Root
         self.gui.tools_menu_convert_ventral_root.triggered.connect(self.convert_ventral_root)
 
         # Create Stimulus from File
         self.gui.tools_menu_create_stimulus.triggered.connect(self.create_stimulus_from_file)
-
-        # Ventral Root Event Detection
-        # self.gui.tools_menu_detect_vr.triggered.connect(self._ventral_root_detection)
 
         # KeyBoard Bindings
         self.gui.key_pressed.connect(self.on_key_press)
@@ -236,83 +215,6 @@ class Controller(QObject):
 
         # Remove the column
         self.data_handler.delete_column(data_set_type, data_set_name, col_nr)
-
-    def draw_selection(self, status='start'):
-        if status == 'exit' and self.cut_out_region is not None:
-            self.data_plotter.master_plot.removeItem(self.cut_out_region)
-        else:
-            # Add a LinearRegionItem to select a region
-            self.cut_out_region = pg.LinearRegionItem(
-                [self.mouse_x_pos, self.mouse_x_pos + 10],
-                brush=QBrush(QColor(255, 0, 0, 50)),
-                pen=pg.mkPen(color=(255, 0, 0), width=5),
-                hoverBrush=QBrush(QColor(255, 0, 0, 100)),
-                hoverPen=pg.mkPen(color=(0, 255, 0), width=5),
-                movable=True,
-                bounds=None,
-                swapMode='sort',
-                clipItem=None
-            )
-            self.data_plotter.master_plot.addItem(self.cut_out_region)
-
-    def cut_selection(self):
-        # Get the selected region boundaries
-        if self.cut_out_region is not None:
-
-            # Get tag info from user
-            dialog = SimpleInputDialog('Save Selection', 'Tag:')
-            if dialog.exec() == dialog.DialogCode.Accepted:
-                tag_name = dialog.get_input()
-            else:
-                return None
-
-            min_x, max_x = self.cut_out_region.getRegion()
-
-            # Get all data that is visible on the plot
-            # Prepare Data Frame for csv file
-            results = pd.DataFrame()
-            k = 0
-            for data_set in self.data_plotter.master_plot.listDataItems():
-                column_name = f'{data_set.name()}_{tag_name}'
-                x = data_set.getData()[0]
-                y = data_set.getData()[1]
-
-                if y is not None and x is not None:
-                    # Find the indices of the region
-                    min_idx = np.searchsorted(x, min_x)
-                    max_idx = np.searchsorted(x, max_x)
-
-                    # Extract and store the selected region
-                    if k == 0:
-                        selected_x = x[min_idx:max_idx]
-                        results['Time'] = selected_x
-
-                    selected_y = y[min_idx:max_idx]
-                    results[column_name] = selected_y
-                    k += 1
-
-            # Store to HDD
-            results.to_csv(f'roibaview/temp/{datetime.now().strftime("%Y_%m_%d_%H_%M_%S")}_{tag_name}.csv')
-            # Remove Selection Markers from Plot
-            self.data_plotter.master_plot.removeItem(self.cut_out_region)
-
-    # def _ventral_root_detection(self):
-    #     if len(self.selected_data_sets) > 0:
-    #         self.gui.freeze_gui(True)
-    #         data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
-    #         current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
-    #         meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
-    #
-    #         self.vr_detection = VentralRootDetection(
-    #             data=current_data_set,
-    #             fr=meta_data['sampling_rate'],
-    #             master_plot=self.data_plotter.master_plot,
-    #             roi=self.current_roi_idx,
-    #         )
-    #         self.vr_detection.show()
-    #         if self.vr_detection.exec() == QDialog.DialogCode.Accepted:
-    #             self.gui.freeze_gui(False)
-    #             self.vr_detection = None
 
     def export_to_csv(self):
         file_dir = self.file_browser.save_file_name('csv file, (*.csv *.txt)')
@@ -471,11 +373,6 @@ class Controller(QObject):
         self.data_handler.add_meta_data(data_set_type=data_set_type, data_set_name=data_set_name, metadata_dict={'color': color})
         self.update_plots(change_global=True)
 
-    def csv_remove_column(self):
-        csv_handler = CSVHandler(self.gui)
-        csv_handler.remove_column_from_csv_file()
-        print('YUHUUUU')
-
     def connect_video_to_plot(self, time_point):
         for v in self.video_viewers:
             if v.connected_to_data_trace:
@@ -633,86 +530,6 @@ class Controller(QObject):
         data_set_item = self.selected_data_sets_items[k]
         return data_set_name, data_set_type, data_set_item
 
-    def filter_data(self, mode):
-        if len(self.selected_data_sets) > 0:
-            for k, _ in enumerate(self.selected_data_sets):
-                data_set_name = self.selected_data_sets[k]
-                data_set_type = self.selected_data_sets_type[k]
-                data = self.data_handler.get_data_set(data_set_type=data_set_type, data_set_name=data_set_name)
-                meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
-                fr = meta_data['sampling_rate']
-                filtered_data = None
-                if mode == 'moving_average':
-                    # Get settings by user input
-                    dialog = InputDialog(dialog_type='moving_average')
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        received = dialog.get_input()
-                        win = float(received['window'])
-                    else:
-                        return None
-                    filtered_data = self.data_transformer.filter_moving_average(data, fr=fr, window=win)
-
-                if mode == 'diff':
-                    filtered_data = self.data_transformer.filter_differentiate(data)
-
-                if mode == 'lowpass':
-                    # Get settings by user input
-                    dialog = InputDialog(dialog_type='butter')
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        received = dialog.get_input()
-                        cutoff = float(received['cutoff'])
-                    else:
-                        return None
-                    filtered_data = self.data_transformer.filter_low_pass(data, cutoff, fs=fr)
-
-                if mode == 'highpass':
-                    # Get settings by user input
-                    dialog = InputDialog(dialog_type='butter')
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        received = dialog.get_input()
-                        cutoff = float(received['cutoff'])
-                    else:
-                        return None
-                    filtered_data = self.data_transformer.filter_high_pass(data, cutoff, fs=fr)
-
-                if mode == 'env':
-                    # Get settings by user input
-                    dialog = InputDialog(dialog_type='butter')
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        received = dialog.get_input()
-                        cutoff = float(received['cutoff'])
-                    else:
-                        return None
-                    filtered_data = self.data_transformer.envelope(data, cutoff, fr)
-
-                if mode == 'ds':
-                    # Get settings by user input
-                    dialog = InputDialog(dialog_type='ds')
-                    if dialog.exec() == QDialog.DialogCode.Accepted:
-                        received = dialog.get_input()
-                        ds_factor = int(received['ds_factor'])
-                    else:
-                        return None
-                    filtered_data, fr = self.data_transformer.down_sampling(data, ds_factor, fr)
-
-                if filtered_data is not None:
-                    # Create a new data set from this
-                    check = self.data_handler.add_new_data_set(
-                        data_set_type=data_set_type,
-                        data_set_name=f'{data_set_name}_{mode}',
-                        data=filtered_data,
-                        sampling_rate=fr,
-                        time_offset=meta_data['time_offset'],
-                        y_offset=meta_data['y_offset'],
-                    )
-                    # Add new data set to the list in the GUI
-                    if check:
-                        # data name already exists, so we have to change it
-                        data_set_name = f'{data_set_name}_{mode}' + '_new'
-                    else:
-                        data_set_name = f'{data_set_name}_{mode}'
-                    self.add_data_set_to_list(data_set_type, data_set_name)
-
     def context_menu(self, mode):
         result = None
         if len(self.selected_data_sets) > 0:
@@ -852,6 +669,7 @@ class Controller(QObject):
                 data_set_name = received['data_set_name']
                 fr = float(received['fr'])
                 is_global = received['is_global']
+                single_column = received['select_column']
             else:
                 return None
 
@@ -867,10 +685,17 @@ class Controller(QObject):
                 data_set_name = data_set_name + '_new'
 
             # Import csv file
-            self.data_handler.import_csv(file_dir=file_dir, data_name=data_set_name, sampling_rate=fr, data_set_type=data_set_type)
+            status = self.data_handler.import_csv(
+                file_dir=file_dir,
+                data_name=data_set_name,
+                sampling_rate=fr,
+                data_set_type=data_set_type,
+                column=single_column
+            )
 
             # Add new data set to the list in the GUI
-            self.add_data_set_to_list(data_set_type, data_set_name)
+            if status:
+                self.add_data_set_to_list(data_set_type, data_set_name)
 
     def add_data_set_to_list(self, data_set_type, data_set_name):
         # row = self.gui.data_sets_list.count()
@@ -942,15 +767,6 @@ class Controller(QObject):
             mouse_point = self.data_plotter.master_plot.vb.mapSceneToView(pos)
             # Get x value (corresponding to time axis)
             self.mouse_x_pos = mouse_point.x()
-            modifiers = QApplication.keyboardModifiers()
-            if modifiers == Qt.KeyboardModifier.ControlModifier:  # Ctrl key
-                # Enter Cutout Mode
-                if self.signal_selection_status:
-                    self.signal_selection_status = False
-                    self.draw_selection(status='exit')
-                else:
-                    self.draw_selection()
-                    self.signal_selection_status = np.invert(self.signal_selection_status)
 
     def on_key_press(self, event):
         if event.key() == Qt.Key.Key_Left:
@@ -959,8 +775,6 @@ class Controller(QObject):
         elif event.key() == Qt.Key.Key_Right:
             # right arrow key
             self.next_roi()
-        elif event.key() == Qt.Key.Key_Return and self.signal_selection_status:
-            self.cut_selection()
 
     def closeEvent(self, event):
         retval = self.gui.exit_dialog()

@@ -6,7 +6,7 @@ import pandas as pd
 import tempfile
 from PyQt6.QtCore import pyqtSignal, QObject
 from scipy import signal
-from roibaview.gui import MessageBox
+from roibaview.gui_utils import MessageBox
 from scipy.signal import decimate, resample
 
 """
@@ -61,7 +61,7 @@ class DataHandler(QObject):
             f.create_group('data_sets')
             f.create_group('global_data_sets')
 
-    def import_csv(self, file_dir, data_name, sampling_rate, data_set_type):
+    def import_csv(self, file_dir, data_name, sampling_rate, data_set_type, column):
         # The .csv file: Each Column is the data of one ROI so the shape is (Samples, ROIs)
         # First check if there are headers (ROI Names)
         data_check = pd.read_csv(file_dir, decimal=self.csv_decimal, sep=self.csv_sep, index_col=None, nrows=1, header=None)
@@ -73,8 +73,6 @@ class DataHandler(QObject):
             if 'Unnamed: 0' in data_file.keys():
                 data_file.drop(columns='Unnamed: 0', inplace=True)
             headers = np.array(data_file.keys())
-            # headers = data_check.iloc[0, :].to_numpy()
-
         else:
             data_file = pd.read_csv(file_dir, decimal=self.csv_decimal, sep=self.csv_sep, index_col=None, header=None)
 
@@ -87,6 +85,19 @@ class DataHandler(QObject):
         # This needs to be converted to a numpy matrix
         data = data_file.to_numpy()
 
+        # Check if user wants only a specific column
+        try:
+            col_id = int(column)
+        except ValueError:
+            col_id = None
+
+        if col_id is not None and data_set_type == 'global_data_sets':
+            try:
+                data = data[:, col_id].reshape(-1, 1)
+            except IndexError:
+                MessageBox(title='ERROR', text='Selected column exceeds number of columns in data!')
+                return False
+
         # Check dimensions (must match hdf5 style)
         if data.ndim == 1:
             data = np.atleast_2d(data)
@@ -98,6 +109,7 @@ class DataHandler(QObject):
             time_offset=0,
             y_offset=0,
             header=headers)
+        return True
 
     def get_info(self):
         with h5py.File(self.temp_file_name, 'r') as f:

@@ -1,15 +1,13 @@
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLabel, QCheckBox,\
     QComboBox, QApplication, QDoubleSpinBox
-from roibaview.gui import SimpleInputDialog
+from roibaview.gui_utils import SimpleInputDialog
 import ffmpy
 import os
 import subprocess
 import cv2
 from tifffile import imwrite
-from concurrent.futures import ThreadPoolExecutor
 import math
-import pandas as pd
 from roibaview.plugins.base import BasePlugin
 
 

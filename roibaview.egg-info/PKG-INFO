@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: roibaview
-Version: 0.1.2
+Version: 0.1.4
 Summary: A PyQt6-based application for ROI visualization.
 Home-page: https://github.com/UniNilsBrehm/roibaview
 Author: Nils
@@ -19,6 +19,7 @@ Requires-Dist: tifftools
 Requires-Dist: tifffile
 Requires-Dist: opencv-python
 Requires-Dist: ffmpy
+Requires-Dist: joblib
 Requires-Dist: roifile
 Dynamic: author
 Dynamic: home-page

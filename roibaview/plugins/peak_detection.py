@@ -3,7 +3,7 @@ import numpy as np
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import QVBoxLayout, QSlider, QLabel, QSpacerItem, QSizePolicy, QMessageBox, QDialog, QPushButton
 from scipy import signal
-from roibaview.gui import BrowseFileDialog
+from roibaview.gui_utils import BrowseFileDialog
 import pandas as pd
 from roibaview.plugins.base import BasePlugin
 
@@ -11,6 +11,7 @@ from roibaview.plugins.base import BasePlugin
 class PeakDetectionPlugin(BasePlugin):
     name = "Peak Detection"
     category = "tool"
+    shortcut = "Ctrl+Shift+P"
 
     def __init__(self, config=None, parent=None):
         self.config = config

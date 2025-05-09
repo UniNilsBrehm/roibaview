@@ -1,11 +1,10 @@
 import pyqtgraph as pg
 import os
 import numpy as np
-from PyQt6.QtCore import pyqtSignal, QObject, Qt
-from PyQt6.QtWidgets import QVBoxLayout, QSlider, QLabel, QWidget, QSpacerItem, QSizePolicy, QMessageBox, QDialog, \
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QSpacerItem, QSizePolicy, QMessageBox, QDialog, \
     QPushButton, QLineEdit
-from scipy import signal
-from roibaview.gui import BrowseFileDialog
+from roibaview.gui_utils import BrowseFileDialog
 import pandas as pd
 import scipy.signal as sig
 from roibaview.plugins.base import BasePlugin
