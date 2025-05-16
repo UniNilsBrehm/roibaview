@@ -150,8 +150,8 @@ class Controller(QObject):
         self.gui.data_sets_list.itemSelectionChanged.connect(self.data_set_selection_changed)
 
         # Arrow Buttons
-        self.gui.next_button.clicked.connect(self.next_roi)
-        self.gui.prev_button.clicked.connect(self.prev_roi)
+        # self.gui.next_button.clicked.connect(self.next_roi)
+        # self.gui.prev_button.clicked.connect(self.prev_roi)
 
         # ROI changed
         self.signal_roi_idx_changed.connect(lambda: self.update_plots(change_global=False))
@@ -522,6 +522,9 @@ class Controller(QObject):
                     self.add_data_set_to_list(data_set_type, data_set_name)
 
     def next_roi(self):
+        # Note: Future Update:
+        # - check all selected data sets and take the largest number of rois
+        # - if the smaller data sets runs out of rois, just plot nothing
         # First check if there are active data sets
         if 'data_sets' in self.selected_data_sets_type:
             self.current_roi_idx = (self.current_roi_idx + 1) % self.data_handler.roi_count
@@ -569,7 +572,12 @@ class Controller(QObject):
         # Update Plot
         if len(roi_data) > 0:
             self.data_plotter.update(time_points, roi_data, meta_data_list)
-            self.data_plotter.master_plot.setTitle(f'ROI: {self.current_roi_idx+1}')
+            # Future Update:
+            # - Take the column headers as ROI names
+            if data_set_type == 'data_sets':
+                roi_name = f"ROI: {meta_data['roi_names'][self.current_roi_idx]} ({meta_data['name']})"
+                self.data_plotter.master_plot.setTitle(roi_name)
+            # self.data_plotter.master_plot.setTitle(f'ROI: {self.current_roi_idx+1}')
         else:
             self.data_plotter.clear_plot_data(name='data')
 

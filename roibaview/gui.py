@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
                          window_height)
 
     def _setup_ui(self):
-        self.setWindowTitle("Ca Event Analysis")
+        self.setWindowTitle("RoiBaView")
         # Central Widget of the Main Window
         self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         # Data Plot
         self.trace_plot_item = self.plot_graphics_layout_widget.addPlot(title='', clear=True, name='data')
         self.trace_plot_item.hideButtons()
+        self.trace_plot_item.setLabel('bottom', 'Time (s)')  # X-axis label
 
         # Dataset List
         self.data_sets_list = QListWidget()
@@ -115,18 +116,18 @@ class MainWindow(QMainWindow):
         self.layout_labels.addStretch()
 
         # buttons
-        button_text_font = QFont('Sans Serif', 12)
-        button_text_font.setBold(True)
-        self.next_button = QPushButton('>>', self)
-        self.prev_button = QPushButton('<<', self)
-        self.next_button.setFont(button_text_font)
-        self.prev_button.setFont(button_text_font)
+        # button_text_font = QFont('Sans Serif', 12)
+        # button_text_font.setBold(True)
+        # self.next_button = QPushButton('>>', self)
+        # self.prev_button = QPushButton('<<', self)
+        # self.next_button.setFont(button_text_font)
+        # self.prev_button.setFont(button_text_font)
 
         # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         # Set Button Layout
         layout_buttons = QHBoxLayout()
-        layout_buttons.addWidget(self.prev_button)
-        layout_buttons.addWidget(self.next_button)
+        # layout_buttons.addWidget(self.prev_button)
+        # layout_buttons.addWidget(self.next_button)
 
         # Set Main Layout
         # Vertical Box Layout
