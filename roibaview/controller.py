@@ -2,15 +2,11 @@ import os
 import numpy as np
 import pandas as pd
 import configparser
-from datetime import datetime
-from PyQt6.QtWidgets import QMessageBox, QListWidgetItem, QDialog, QApplication
+from PyQt6.QtWidgets import QMessageBox, QListWidgetItem, QDialog
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
-from PyQt6.QtGui import QBrush, QColor
-import pyqtgraph as pg
 from roibaview.data_handler import DataHandler
 from roibaview.gui_utils import SimpleInputDialog, BrowseFileDialog, InputDialog, ChangeStyle, MessageBox
 from roibaview.data_plotter import DataPlotter, PyqtgraphSettings
-from roibaview.registration import Registrator
 from roibaview.video_viewer import VideoViewer
 from roibaview.plugins.loader import load_plugins
 
@@ -49,7 +45,6 @@ class Controller(QObject):
         # Get a Video Viewer
         self.video_viewer = VideoViewer()
         self.video_viewers = []
-        # self.video_converter = None
 
         # Get DataPlotter
         self.data_plotter = DataPlotter(self.gui.trace_plot_item)
@@ -228,7 +223,6 @@ class Controller(QObject):
 
             # Export selected data set to csv
             data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(0)
-            # meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
             df = pd.DataFrame(self.data_handler.get_data_set(data_set_type=data_set_type, data_set_name=data_set_name))
             df.to_csv(file_dir, index=False, header=False)
 
@@ -395,13 +389,6 @@ class Controller(QObject):
         self.video_viewers[-1].show()
         self.video_viewers[-1].TimePoint.connect(self.connect_video_to_plot)
 
-        # self.video_viewer = VideoViewer()
-        # self.video_viewer.show()
-
-    # def open_video_converter(self):
-    #     self.video_converter = VideoConverter(self.config)
-    #     self.video_converter.show()
-
     def y_offset(self):
         if len(self.selected_data_sets) > 0:
             for k, _ in enumerate(self.selected_data_sets):
@@ -459,8 +446,6 @@ class Controller(QObject):
             new_name = received['data_set_name']
             if new_name != '':
                 self.data_handler.rename_data_set(data_set_type=data_set_type, data_set_name=data_set_name, new_name=new_name)
-                # self.remove_selected_data_set_from_list(data_set_name, data_set_item)
-                # self.add_data_set_to_list(data_set_type, new_name)
                 self.rename_item_from_list(data_set_item=data_set_item, new_name=new_name)
             else:
                 dlg = QMessageBox()
@@ -482,44 +467,8 @@ class Controller(QObject):
             button = dlg.exec()
             if button == QMessageBox.StandardButton.Yes:
                 for dt, ds, item in zip(self.selected_data_sets_type, self.selected_data_sets, self.selected_data_sets_items):
-                    # print(ds, item)
-                    # print('')
                     self.data_handler.delete_data_set(dt, ds)
                     self.remove_selected_data_set_from_list(ds, item)
-
-    def tiff_registration(self):
-        registrator = Registrator()
-        # Get file dir
-        file_dir = self.file_browser.browse_file('tiff file, (*.tiff; *.tif)')
-        if file_dir:
-            registrator.start_registration(file_dir)
-
-    # def check_peak_detector(self):
-    #     if self.peak_detection is not None:
-    #         self.peak_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
-    #     if self.vr_detection is not None:
-    #         self.vr_detection.roi_changed(self.current_roi_idx)  # This will trigger the signal
-
-    # def _start_peak_detection(self):
-    #     if len(self.selected_data_sets) > 0:
-    #         self.gui.freeze_gui(True)
-    #         data_set_name, data_set_type, data_set_item = self.get_selected_data_sets(k=0)
-    #         # current_data = self.data_handler.get_roi_data(data_set_name, roi_idx=self.current_roi_idx)
-    #         current_data_set = self.data_handler.get_data_set(data_set_name=data_set_name, data_set_type=data_set_type)
-    #         meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
-    #
-    #         self.peak_detection = PeakDetection(
-    #             data=current_data_set + meta_data['y_offset'],
-    #             fr=meta_data['sampling_rate'],
-    #             master_plot=self.data_plotter.master_plot,
-    #             roi=self.current_roi_idx,
-    #         )
-    #         # self.peak_detection.signal_roi_changed.connect(lambda value: print("Variable changed:", value))
-    #         self.peak_detection.show()
-    #         if self.peak_detection.exec() == QDialog.DialogCode.Accepted:
-    #             self.gui.freeze_gui(False)
-    #             self.peak_detection = None
-    #         # self.peak_detection.exec()
 
     def get_selected_data_sets(self, k):
         data_set_name = self.selected_data_sets[k]
@@ -531,11 +480,8 @@ class Controller(QObject):
         result = None
         if len(self.selected_data_sets) > 0:
             for k, _ in enumerate(self.selected_data_sets):
-                # k = 0
                 data_set_name = self.selected_data_sets[k]
                 data_set_type = self.selected_data_sets_type[k]
-                # if data_set_type != 'data_sets':
-                #     return None
                 data = self.data_handler.get_data_set(data_set_type=data_set_type, data_set_name=data_set_name)
                 meta_data = self.data_handler.get_data_set_meta_data(data_set_type=data_set_type, data_set_name=data_set_name)
                 if mode == 'df_f':
@@ -555,7 +501,6 @@ class Controller(QObject):
 
                 if mode == 'min_max':
                     result = self.data_transformer.to_min_max(data)
-                    # print('MIN_MAX')
 
                 # Create a new data set from this
                 if result is not None:
@@ -589,7 +534,6 @@ class Controller(QObject):
             self.signal_roi_idx_changed.emit()
 
     def update_plots(self, change_global=True):
-        # print(f'ROI: {self.current_roi_idx}')
         # get new roi data
         roi_data = []
         time_points = []
@@ -603,7 +547,6 @@ class Controller(QObject):
                 r = self.data_handler.get_roi_data(data_set_name, roi_idx=self.current_roi_idx)
                 meta_data = self.data_handler.get_data_set_meta_data('data_sets', data_set_name)
                 fr = meta_data['sampling_rate']
-                # print(f'{data_set_name}: fr={fr} Hz (shape={r.shape[0]}) samples')
                 time_offset = meta_data['time_offset']
                 y_offset = meta_data['y_offset']
                 try:
@@ -641,12 +584,7 @@ class Controller(QObject):
         # Get selected data sets
         self.selected_data_sets = [item.text() for item in self.gui.sender().selectedItems()]
         self.selected_data_sets_type = [item.data(1) for item in self.gui.sender().selectedItems()]
-        # self.selected_data_sets_rows = [k for k in self.gui.sender().selectedItems()]
         self.selected_data_sets_items = [k for k in self.gui.sender().selectedItems()]
-
-        # print('')
-        # print(f"Selected Items: {self.selected_data_sets}, QItem: {self.selected_data_sets_items}")
-        # print('')
 
         # Update Plots
         self.update_plots()
@@ -656,10 +594,8 @@ class Controller(QObject):
         file_dir = self.file_browser.browse_file('csv file, (*.csv *.txt)')
         if file_dir:
             # Get data set name by user
-            # dialog = ImportCsvDialog()
             dialog = InputDialog(dialog_type='import_csv')
             if dialog.exec() == QDialog.DialogCode.Accepted:
-                # data_set_name, fr, is_global = dialog.get_settings()
                 received = dialog.get_input()
                 data_set_name = received['data_set_name']
                 fr = float(received['fr'])
@@ -706,11 +642,6 @@ class Controller(QObject):
         item.setText(new_name)
 
     def remove_selected_data_set_from_list(self, data_set_name, data_set_item):
-        # list_items = self.gui.data_sets_list.selectedItems()
-        # if not list_items:
-        #     return
-        # for item in list_items:
-        #     self.gui.data_sets_list.takeItem(self.gui.data_sets_list.row(item))
         if not data_set_name:
             return
         else:
@@ -778,23 +709,14 @@ class Controller(QObject):
             # Save before exit
             self.save_file()
             event.accept()
-            # if self.peak_detection is not None:
-            #     self.peak_detection.main_window_closing.emit()
-            # self._save_file()
             self.data_handler.create_new_temp_hdf5_file()
         elif retval == QMessageBox.StandardButton.Discard:
             # Do not save before exit
             event.accept()
-            # if self.peak_detection is not None:
-            #     self.peak_detection.main_window_closing.emit()
             self.data_handler.create_new_temp_hdf5_file()
         else:
             # Do not exit
             event.ignore()
-
-    # def exit_app(self):
-    #     self.data_handler.create_new_temp_hdf5_file()
-    #     self.gui.close()
 
     def mouse_moved(self, event):
         vb = self.gui.trace_plot_item.vb

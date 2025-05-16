@@ -195,8 +195,6 @@ class VideoViewer(QMainWindow):
                                                roi_index=index)
             self.image_view.addItem(scatter)
 
-
-
         for index, roi in enumerate(self.rois):
             # Get ROI coordinates
             coordinates = np.array(roi.coordinates())

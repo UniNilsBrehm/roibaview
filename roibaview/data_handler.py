@@ -6,12 +6,10 @@ import pandas as pd
 import tempfile
 from PyQt6.QtCore import pyqtSignal, QObject
 from roibaview.gui_utils import MessageBox
-from scipy.signal import decimate, resample
-
 """
 Notes:
     - Try to use PyTables instead of h5py
-    - Try using NixPiy
+    - Try using NixPy
 
 Data Structure:
 .
@@ -52,9 +50,6 @@ class DataHandler(QObject):
         self.csv_sep = ','
 
     def create_new_temp_hdf5_file(self):
-        # from IPython import embed
-        # embed()
-        # exit()
         # Will create an empty hdf5 file into the temp directory with one group called "data_sets"
         with h5py.File(self.temp_file_name, 'w') as f:
             f.create_group('data_sets')
@@ -150,9 +145,6 @@ class DataHandler(QObject):
     def delete_data_set(self, data_set_type, data_set_name):
         with h5py.File(self.temp_file_name, 'r+') as f:
             if data_set_name in f[data_set_type]:
-                # print('Delete:')
-                # print(f[data_set_type][data_set_name])
-                # f[data_set_type][data_set_name][:] = 0
                 del f[data_set_type][data_set_name]
 
     def rename_data_set(self, data_set_type, data_set_name, new_name):
@@ -264,32 +256,3 @@ class DataHandler(QObject):
     def compute_time_axis(data_size, fr):
         max_time = data_size / fr
         return np.linspace(0, max_time, data_size)
-
-
-# class TransformData(QObject):
-#     signal_data_transformed = pyqtSignal()
-#
-#     def __init__(self):
-#         QObject.__init__(self)
-#
-#     @staticmethod
-#     def down_sampling(data, ds_factor, fs):
-#         # New sampling rate
-#         new_fs = fs / ds_factor
-#         # new_samples = int(data.shape[0] / ds_factor)
-#         # down_sampled_data = resample(data, new_samples)
-#         # Apply decimate function to downsample the data
-#         down_sampled_data = decimate(data, ds_factor, axis=0)
-#
-#         return down_sampled_data, new_fs
-#
-#     @staticmethod
-#     def prepare_data(data):
-#         # Since hdf5 and numpy like their data structured differently, we have to transform it
-#         # Check if there is only one ROI (Column)
-#         if data.shape[1] == 1:
-#             new_data = data.flatten()
-#         else:
-#             # otherwise transpose it
-#             new_data = data.T
-#         return new_data
