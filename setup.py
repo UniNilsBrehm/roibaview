@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="roibaview",
-    version="0.1.6",
+    version="0.1.8",
     license="MIT",
     packages=find_packages(),
     include_package_data=True,
@@ -18,6 +18,7 @@ setup(
         "opencv-python",
         "ffmpy",
         "joblib",
+        "platformdirs",
         "roifile"
     ],
     entry_points={

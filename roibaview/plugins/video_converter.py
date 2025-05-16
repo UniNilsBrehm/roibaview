@@ -3,6 +3,8 @@ import os
 import math
 import subprocess
 import cv2
+import configparser
+from platformdirs import user_config_dir
 from tifffile import imwrite
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (
@@ -23,7 +25,7 @@ class VideoConverterPlugin(BasePlugin):
         self.parent = parent
 
     def apply(self, *_):
-        self.window = VideoConverter(self.config)
+        self.window = VideoConverter()
         self.window.show()
 
 
@@ -31,10 +33,25 @@ class VideoConverter(QMainWindow):
 
     ffmpeg_dir_set = pyqtSignal()
 
-    def __init__(self, convert_settings):
+    def __init__(self):
         super().__init__()
+        CONFIG_FILENAME = "video_converter_settings.ini"
+        config_dir = user_config_dir('roibaview')
+        os.makedirs(config_dir, exist_ok=True)
+        self.config_path = os.path.join(config_dir, CONFIG_FILENAME)
+        # Create or read config
+        self.config = configparser.ConfigParser()
+        # If config file exists, read it
+        if os.path.exists(self.config_path):
+            self.config.read(self.config_path)
+        else:
+            # Create default config
+            self.config['ffmpeg'] = {
+                'dir': '',
+            }
+            with open(self.config_path, 'w') as configfile:
+                self.config.write(configfile)
 
-        self.settings = convert_settings
         self.input_file = None
         self.output_file = None
 
@@ -68,7 +85,7 @@ class VideoConverter(QMainWindow):
         self.change_ffmpeg_dir_button = QPushButton("Set ffmpeg directory")
         self.change_ffmpeg_dir_button.clicked.connect(self.browse_file_ffmpeg)
 
-        self.ffmpeg_dir_label = QLabel(f'ffmpeg at: {self.settings["FFMPEG"]["dir"]}')
+        self.ffmpeg_dir_label = QLabel(f'ffmpeg at: {self.config["ffmpeg"]["dir"]}')
 
         self.gpu_check_box = QCheckBox()
         self.gpu_check_box.setCheckState(Qt.CheckState.Unchecked)
@@ -153,9 +170,10 @@ class VideoConverter(QMainWindow):
         self.setCentralWidget(central_widget)
         self.setWindowTitle("Video Converter")
 
-        if self.settings['FFMPEG']['dir'] == 'NaN':
+        if self.config['ffmpeg']['dir'] == '':
             self.browse_file_ffmpeg()
-        self.ffmpeg_dir = self.settings['FFMPEG']['dir']
+
+        self.ffmpeg_dir = self.config['ffmpeg']['dir']
         self.ffmpeg_probe = f'{os.path.split(self.ffmpeg_dir)[0]}/ffprobe.exe'
         self._define_ffmpeg_settings()
 
@@ -413,10 +431,11 @@ class VideoConverter(QMainWindow):
 
     def browse_file_ffmpeg(self):
         self.ffmpeg_dir, _ = QFileDialog.getOpenFileName(self, "Select FFMPEG .exe", "", "ffmpeg (*.exe)")
-        # self.settings.modify_setting('ffmpeg', self.ffmpeg_dir)
-        self.settings['FFMPEG']['dir'] = self.ffmpeg_dir
-        with open('roibaview/config.ini', 'w') as configfile:
-            self.settings.write(configfile)
+        # Modify and save
+        self.config['ffmpeg']['dir'] = self.ffmpeg_dir
+        with open(self.config_path, 'w') as configfile:
+            self.config.write(configfile)
+
         self.ffmpeg_dir_label.setText(f'ffmpeg at: {self.ffmpeg_dir}')
 
     def please_wait_status(self):
