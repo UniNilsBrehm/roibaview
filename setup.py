@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="roibaview",
-    version="0.1.9",
+    version="0.2.0",
     license="MIT",
     packages=find_packages(),
     include_package_data=True,

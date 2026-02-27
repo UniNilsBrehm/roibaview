@@ -549,19 +549,47 @@ class Controller(QObject):
             if data_set_type == 'data_sets':
                 r = self.data_handler.get_roi_data(data_set_name, roi_idx=self.current_roi_idx)
                 meta_data = self.data_handler.get_data_set_meta_data('data_sets', data_set_name)
+
+                # make sure meta_data format is correct:
+                for k in ("sampling_rate", "time_offset", "y_offset"):
+                    v = meta_data[k]
+                    if isinstance(v, (bytes, bytearray)):
+                        v = v.decode("utf-8")
+                    meta_data[k] = float(v)
+
                 fr = meta_data['sampling_rate']
                 time_offset = meta_data['time_offset']
                 y_offset = meta_data['y_offset']
+
+                # Add time axis
                 try:
                     time_points.append(self.data_handler.compute_time_axis(r.shape[0], fr) + time_offset)
                 except AttributeError:
                     return
 
+                # Test for error:
+                print("type(r):", type(r))
+                try:
+                    import numpy as np
+                    print("r dtype:", getattr(r, "dtype", None))
+                except Exception:
+                    pass
+
+                print("y_offset:", y_offset, "type:", type(y_offset))
+                # Here some TypeError can happen:
                 roi_data.append(r + y_offset)
                 meta_data_list.append(meta_data)
             if data_set_type == 'global_data_sets' and change_global:
                 r = self.data_handler.get_data_set('global_data_sets', data_set_name)
                 meta_data = self.data_handler.get_data_set_meta_data('global_data_sets', data_set_name)
+
+                # make sure meta_data format is correct:
+                for k in ("sampling_rate", "time_offset", "y_offset"):
+                    v = meta_data[k]
+                    if isinstance(v, (bytes, bytearray)):
+                        v = v.decode("utf-8")
+                    meta_data[k] = float(v)
+
                 fr = meta_data['sampling_rate']
                 time_offset = meta_data['time_offset']
                 y_offset = meta_data['y_offset']
